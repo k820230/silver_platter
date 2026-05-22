@@ -641,6 +641,8 @@ FK 의존성을 고려한 초기 생성 순서:
 | 단일 종목 최대 투자금액 | 1,000,000,000 KRW |
 | 자동 주문 1건 최대 금액 | 1,000,000,000 KRW |
 | 자동 주문 가능 시간 | broker/거래소가 주문 가능으로 반환하는 모든 거래 시간 |
+| 종목별 유동성 한도 | 주문금액 / 20거래일 평균 거래대금 <= 5% |
+| 사업 그룹 유동성 한도 | 그룹 내 당일 신규 주문금액 합계 / 그룹 20거래일 평균 거래대금 합계 <= 5% |
 | 저유동성 슬리피지 배수 | 3 |
 | 실거래 자동주문 | enabled_with_risk_gate |
 | simulation 주문 broker 전송 | prohibited |
@@ -818,17 +820,17 @@ ORDER BY scheduled_at DESC;
 
 이 순서로 구현하면 데이터 적재, 거래 원장, 리스크 체크, 주문 후보 생성의 최소 폐쇄 루프를 먼저 만들 수 있다.
 
-## 16. 미결정 사항
+## 16. 구현 기본 결정 사항
 
-1. Goldilocks schema/user 분리 방식
-2. identity column 세부 옵션과 sequence 대체 사용 기준
-3. FK를 모든 테이블에 즉시 적용할지, 대량 적재 테이블은 지연 적용할지
-4. `TIMESTAMP WITH TIME ZONE` 사용 가능 여부와 SQLAlchemy 호환성
-5. `LONG VARCHAR`의 최대 길이와 백업/복구 영향
-6. partitioning 도입 시점과 DDL 문법
-7. backup 명령과 checksum 생성 방식. backup 경로는 `/home/jhkim5/backup_sp/{backup_date}/`로 확정
-8. Alembic autogenerate 호환 범위
-9. code table을 물리 테이블로 둘지 application enum으로 시작할지
+1. Goldilocks schema는 `SP`, application user는 `sp_app`으로 시작한다.
+2. identity column을 기본으로 쓰고, Goldilocks 호환성 문제가 있으면 sequence로 대체한다.
+3. master/ledger/risk 핵심 테이블은 FK를 즉시 적용하고, raw 대량 적재 테이블은 FK를 지연 적용한다.
+4. 시각은 UTC `TIMESTAMP`와 market timezone code를 함께 저장하고 `TIMESTAMP WITH TIME ZONE`은 MVP에서 사용하지 않는다.
+5. `LONG VARCHAR` JSON은 1MB 이하로 제한하고, 초과 원문은 raw storage에 둔다.
+6. partitioning은 `price_bar` 5천만 row 초과 또는 월별 유지보수 필요 시 도입한다.
+7. backup은 `scripts/goldilocks_backup.sh` wrapper로 native online backup을 우선 호출하고 checksum을 생성한다.
+8. migration은 수동 SQL을 우선하며 Alembic autogenerate는 참고용으로만 사용한다.
+9. code table은 물리 테이블로 시작한다.
 10. 월간 복구 검증용 test schema 생성/삭제 절차
 
 ## 17. 다음 작업

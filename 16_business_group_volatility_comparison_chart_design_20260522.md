@@ -272,13 +272,13 @@ POST /api/business-groups/volatility-comparison
 | 이벤트 marker | 관련 headline/disclosure 연결 |
 | 품질 flag | degraded/unavailable 표시 |
 
-## 15. 미결정 사항
+## 15. 구현 기본 결정 사항
 
-1. 그룹별 최대 비교 선택 수
-2. 기준일 휴장 처리의 기본값
-3. 변동성 급등 알림 threshold
-4. materialized view 갱신 주기
-5. 포트폴리오 보유 비중 가중을 MVP에 포함할지 여부
+1. 그룹별 최대 비교 선택 수는 10개다.
+2. 기준일이 휴장일이면 직전 유효 거래일을 사용하고 UI에 badge를 표시한다.
+3. 변동성 급등 알림은 기준일 대비 +30% 또는 5거래일 내 +20pt 상승으로 둔다.
+4. materialized view는 장 종료 후 1회, 장중 5분 간격 incremental로 갱신한다.
+5. 포트폴리오 보유 비중 가중은 MVP에서 조회 옵션으로만 제공하고 기본값은 시가총액 가중이다.
 
 ## 16. 다음 산출물
 

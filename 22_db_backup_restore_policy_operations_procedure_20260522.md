@@ -268,13 +268,13 @@ cron 표현:
 | 복구 검증 | row count와 healthcheck |
 | 암호화 없음 | manifest에 none 기록 |
 
-## 17. 미결정 사항
+## 17. 구현 기본 결정 사항
 
-1. Goldilocks 백업 명령어 최종 형태
-2. 복구 검증 주기 최종값
-3. 백업 중 쓰기 lock 또는 online backup 방식
-4. 백업 파일 크기 이상 탐지 threshold
-5. 원격/외장 저장소 추가 여부
+1. Goldilocks 백업은 `scripts/goldilocks_backup.sh` wrapper가 native online backup을 우선 호출한다.
+2. 복구 검증 주기는 월 1회다.
+3. 백업은 online backup을 우선하고, 미지원 시 maintenance lock 후 logical export를 수행한다.
+4. 백업 파일 크기는 최근 4회 median 대비 50% 이상 증감하면 warning으로 처리한다.
+5. 원격/외장 저장소는 MVP에서 제외하고 로컬 `/home/jhkim5/backup_sp`만 사용한다.
 
 ## 18. 다음 산출물
 

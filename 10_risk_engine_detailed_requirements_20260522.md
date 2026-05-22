@@ -304,7 +304,7 @@ exposure_weight = post_trade_exposure_market_value / post_trade_portfolio_market
 | `RISK-GRP-001` | 사업 그룹별 최대 비중 확인 | block |
 | `RISK-GRP-002` | 사업 그룹별 최대 손실 한도 확인 | block |
 | `RISK-GRP-003` | 사업 그룹별 VaR/CVaR 한도 확인 | block |
-| `RISK-GRP-004` | 사업 그룹별 유동성 한도 확인 | manual_approval |
+| `RISK-GRP-004` | 사업 그룹별 유동성 한도 확인 | block |
 | `RISK-GRP-005` | 국내외 같은 사업 그룹 총 노출 합산 | block |
 | `RISK-GRP-006` | 그룹 내부 종목 간 상관관계 급등 확인 | warning |
 | `RISK-GRP-007` | 그룹 내 peer 대비 가격 괴리 확인 | warning |
@@ -321,15 +321,23 @@ exposure_weight = post_trade_exposure_market_value / post_trade_portfolio_market
 | `RISK-LIQ-003` | 호가 스프레드가 기준 초과인지 확인 | warning |
 | `RISK-LIQ-004` | 저유동성 종목이면 기준 슬리피지의 3배 적용 | warning |
 | `RISK-LIQ-005` | 예상 체결 불확실성이 임계값 초과인지 확인 | manual_approval |
+| `RISK-LIQ-006` | 그룹 내 당일 신규 주문금액 합계가 그룹 20거래일 평균 거래대금 합계의 5%를 초과하는지 확인 | block |
 
 저유동성 판정은 `slippage_rule` 설정을 따른다. MVP 기본 판정 기준은 평균 거래대금이며, 보조 지표로 아래 항목을 함께 저장한다.
 
-- 최근 N거래일 평균 거래대금
-- 주문금액 / 평균 거래대금 비율
+- 최근 20거래일 평균 거래대금
+- 주문금액 / 20거래일 평균 거래대금 비율
 - bid-ask spread
 - 호가 잔량
 - 거래 정지 또는 단일가 매매 여부
 - 장중 체결 공백 시간
+
+MVP 유동성 한도:
+
+| 한도 | 값 | 기본 조치 |
+| --- | ---: | --- |
+| 종목별 주문금액 / 20거래일 평균 거래대금 | 5% 이하 | 초과 시 block |
+| 사업 그룹 내 당일 신규 주문금액 합계 / 그룹 20거래일 평균 거래대금 합계 | 5% 이하 | 초과 시 block |
 
 저유동성 종목의 예상 슬리피지는 다음 방식으로 계산한다.
 
@@ -713,6 +721,8 @@ GET /business-groups/{business_group_id}/risk-summary
 | --- | --- | --- |
 | 단일 종목 최소 투자금액 | 100,000 KRW | `security_investment_amount_limit` |
 | 단일 종목 최대 투자금액 | 1,000,000,000 KRW | `security_investment_amount_limit` |
+| 종목별 유동성 한도 | 주문금액 / 20거래일 평균 거래대금 <= 5% | `risk_limit` |
+| 사업 그룹 유동성 한도 | 그룹 내 당일 신규 주문금액 합계 / 그룹 20거래일 평균 거래대금 합계 <= 5% | `risk_limit` |
 | 저유동성 슬리피지 배수 | 3.0 | `slippage_rule` |
 | VaR confidence | 95%, 99% | `risk_limit` 또는 config |
 | 기본 VaR horizon | 1D, 5D, 20D | `risk_limit` 또는 config |
@@ -855,21 +865,22 @@ GET /business-groups/{business_group_id}/risk-summary
 | FR-UI-014~015 | 6.3, 10 |
 | FR-UI-022~024 | 8.11, 14 |
 
-## 23. 미결정 사항
+## 23. 구현 기본 결정 사항
 
-1. VaR/CVaR의 기본 산출 방식과 confidence/horizon 운영값
-2. 종목별 변동성 지수와 위험도 지수의 1차 산식
-3. 종목별/섹터별/통화별/일일손실/MDD 리스크 한도 상세값
-4. 사업 그룹별 최대 비중, 최대 손실, 유동성 한도 상세값
-5. 저유동성 판정의 N거래일 기준과 평균 거래대금 하한
-6. 수동 승인 권한 체계와 승인 만료 시간
-7. 공시 유형별 block/manual approval 기본 매핑
-8. `risk_check_result.detail` JSON을 별도 테이블로 분리할 시점
+1. VaR/CVaR는 historical simulation으로 시작하고 confidence는 95%, 99%, horizon은 1D, 5D, 20D를 사용한다.
+2. 종목별 변동성 지수는 EWMA V1, 위험도 지수는 component score V1을 사용한다.
+3. 종목 최대 비중은 warning 5%, block 10%; 섹터는 warning 25%, block 35%; USD는 warning 50%, block 70%; 일일손실은 warning -1%, block -2%, stop -3%; MDD는 warning -8%, block -12%, stop -15%로 한다.
+4. 사업 그룹 최대 비중은 warning 20%, block 30%; 일간 손실은 warning -2%, block -4%; MDD는 warning -8%, block -12%로 한다.
+5. 저유동성 절대 하한은 20거래일 평균 거래대금 원화 환산 1,000,000,000원 미만이다.
+6. 수동 승인은 `live_trader` 이상 권한, 만료 시간은 10분이다.
+7. 공시 유형 중 trading_halt, regulatory, litigation severe는 block 후보, earnings/guidance/capital/M&A는 manual approval 기본값으로 둔다.
+8. `risk_check_result.detail`은 MVP에서 JSON으로 저장하고, 100만 row 또는 p95 조회 500ms 초과 시 별도 테이블로 분리한다.
 
 ## 23.1 결정 반영 사항
 
 - 사업 그룹 분류는 표준 산업분류, 내부 사업 유사도 그룹, 수동 보정을 병행한다.
 - 저유동성 판정의 MVP 기본 기준은 평균 거래대금이다.
+- MVP 유동성 한도는 종목별 주문금액/20거래일 평균 거래대금 최대 5%, 사업 그룹 내 당일 신규 주문금액 합계/그룹 20거래일 평균 거래대금 합계 최대 5%로 둔다.
 - 자동 주문은 거래 가능 시간 전체에서 허용하되 자동 주문 1건 최대 금액은 원화 환산 1,000,000,000원이다.
 - 국제 정세 급변 긴급 알림은 사건 발생 후 주식 시장의 5분 평균 거래량이 직전 5거래일 평균 대비 100% 이상 증가하는 조건을 포함한다.
 

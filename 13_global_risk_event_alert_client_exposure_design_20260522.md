@@ -802,16 +802,16 @@ replay mode에서는 과거 이벤트의 `available_for_model_at`, `displayed_at
 | NFR-REL-005 | 10 |
 | NFR-OBS-004 | 16 |
 
-## 24. 미결정 사항
+## 24. 구현 기본 결정 사항
 
-1. `danger`와 `crisis`의 점수 threshold
-2. 공식 확인으로 인정할 source 조합
-3. `crisis` 반복 toast 간격
-4. mute 최대 허용 시간
-5. 포트폴리오 영향 scenario return range의 초기값
-6. 모바일 push notification 포함 여부
-7. 운영자 수동 검토 SLA
-8. delivery replay buffer 보존 시간
+1. `danger` threshold는 70점, `crisis` threshold는 85점으로 한다.
+2. 공식 확인은 공식 source 1개 또는 tier1 전문 뉴스 2개 이상의 독립 확인으로 인정한다.
+3. `crisis` 반복 toast 간격은 5분, 같은 event 최대 6회로 한다.
+4. mute 최대 허용 시간은 danger 30분, crisis 10분이다.
+5. 포트폴리오 영향 scenario return range는 caution -3%, danger -7%, crisis -12%를 초기값으로 둔다.
+6. 모바일 push notification은 MVP에서 제외하고 내부망 Web/PWA 알림만 제공한다.
+7. 운영자 수동 검토 SLA는 crisis 5분, danger 15분, caution 1시간이다.
+8. delivery replay buffer 보존 시간은 24시간이다.
 
 ## 24.1 결정 반영 사항
 

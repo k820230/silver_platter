@@ -363,7 +363,7 @@ open position_lot FIFO 조회
 | --- | --- |
 | `complete` | FIFO, 환율, 수수료, 세법 버전 모두 있음 |
 | `estimated_fee` | 수수료가 예상값 |
-| `pending_fx` | 환율 누락 또는 미확정 |
+| `pending_fx` | 환율 누락 또는 source 응답 불가 |
 | `broker_mismatch` | broker 원화 손익과 차이 큼 |
 | `rule_expired` | 세법 설정 버전 만료 |
 | `error` | 계산 실패 |
@@ -585,17 +585,17 @@ GET /tax/rules/overseas-stock?as_of=2026-05-22
 - 환율 source 확인
 - 신고 참고 리포트 생성
 
-## 18. 미결정 사항
+## 18. 구현 기본 결정 사항
 
-1. 환율 source: broker 제공 환율, 서울외국환중개, 한국은행, provider 환율 중 우선순위
-2. 수수료와 제세금의 필요경비 인정 범위
-3. 국내 주식 손익과 해외 주식 손익통산을 MVP에서 함께 구현할지 여부
-4. 단순 보조 리포트의 법적 문구와 export 형식
-5. 원 단위 절사/반올림 규칙
-6. 여러 증권사 계좌 통합 집계 방식
-7. 양도소득세 예정/확정 신고 구분 표시 범위
-8. 세법 개정 시 과거 예상세액 snapshot 재계산 여부
-9. simulation 계좌 세금 화면의 기본 노출 여부
+1. 실제 체결은 broker 적용 환율, preview/평가는 한국투자증권 현재 환율, 세금 보조는 서울외국환중개 매매기준율, fallback은 한국은행 ECOS를 사용한다.
+2. 수수료와 제세금은 필요경비 후보로 분리 저장하고, 세법 rule version에서 포함 여부를 관리한다.
+3. MVP 세금 리포트는 해외 주식 양도소득세 보조 계산에 한정하고 국내 주식 손익통산은 별도 참고값으로만 표시한다.
+4. 리포트 문구는 "신고 확정 자료가 아닌 보조 추정치"로 고정하고 CSV export를 제공한다.
+5. 원화 세액 표시는 1원 단위 half-up으로 반올림한다.
+6. 여러 증권사 계좌 통합 집계는 계좌별 집계 후 사용자별 합산 view로 구현한다.
+7. 예정/확정 신고 구분은 `estimate`, `filed`, `adjusted` 상태로 표시한다.
+8. 세법 개정 시 과거 snapshot은 재계산하지 않고 새 `tax_rule_version`으로 새 snapshot을 만든다.
+9. simulation 계좌 세금 화면은 기본 노출하되 신고용 flag는 false로 표시한다.
 
 ## 18.1 결정 반영 사항
 

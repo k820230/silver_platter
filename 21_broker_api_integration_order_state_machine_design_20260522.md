@@ -189,6 +189,7 @@ idempotency key 생성 입력:
 - 중복 주문
 - 가격 괴리
 - 평균 거래대금 기준 저유동성
+- 주문금액/20거래일 평균 거래대금 5% 한도
 - 저유동성 3배 슬리피지
 - 사업 그룹/섹터/통화 한도
 - 공시/헤드라인/국제 정세 이벤트
@@ -315,13 +316,13 @@ simulation 주문은 실제 broker API로 전송하지 않는다.
 | FIFO posting | 체결 후 lot 매칭 |
 | 세금 갱신 | 해외 매도 예상세액 |
 
-## 18. 미결정 사항
+## 18. 구현 기본 결정 사항
 
-1. 한국투자증권 Open API 계좌/상품별 실제 주문 가능 범위
-2. 장중 reconciliation 주기 최종값
-3. broker rate limit별 retry 정책
-4. kill switch 활성화 시 기존 open order 자동 취소 여부
-5. 실거래 자동 주문 승인 workflow 세부값
+1. MVP live 주문 가능 범위는 한국투자증권 Open API가 orderable로 반환하는 현금계좌 국내/미국 상장 주식과 ETF로 제한한다.
+2. 장중 reconciliation 주기는 1분, 장 종료 후 1회 full reconciliation으로 한다.
+3. retry는 1초, 2초, 4초 exponential backoff 3회와 idempotency key를 사용한다.
+4. kill switch는 기본적으로 신규 주문만 차단하고, 미체결 주문 일괄 취소는 별도 `cancel_open_orders=true` 수동 명령에서만 수행한다.
+5. 실거래 자동 주문은 strategy whitelist, 일일 운영 enable, risk pass, kill switch off 조건을 모두 만족해야 하며 최초 30건은 수동 승인 후 전송한다.
 
 ## 19. 다음 산출물
 

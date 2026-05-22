@@ -301,13 +301,13 @@ backup-runner는 Goldilocks 백업 명령을 실행하고 결과를 `db_backup_r
 | scheduler | 토요일 10:00 KST schedule 등록 |
 | restart | worker 재시작 후 job 재개 |
 
-## 17. 미결정 사항
+## 17. 구현 기본 결정 사항
 
-1. Goldilocks listener host/port 실제값
-2. Goldilocks backup 명령어 최종 형태
-3. Web/API framework 최종 선택
-4. 로그 보존 기간
-5. 장기 운영 시 systemd와 Compose 중 최종 supervisor
+1. Goldilocks listener 기본값은 `host.docker.internal:22581`이다.
+2. backup 명령은 `scripts/goldilocks_backup.sh` wrapper가 Goldilocks native online backup을 호출한다.
+3. API는 FastAPI, worker는 Python, Web은 React + Vite + TypeScript로 시작한다.
+4. application log 보존 기간은 180일, audit log는 DB에 영구 보존한다.
+5. 장기 운영 supervisor는 Docker Compose를 기본으로 하고, host 부팅 자동화는 systemd unit으로 Compose를 감싼다.
 
 ## 18. 다음 산출물
 

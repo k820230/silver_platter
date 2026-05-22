@@ -682,16 +682,16 @@ GET /accounts/{account_id}/tax/overseas-stock-estimate?tax_year=2026
 - 장기 미해결 reconciliation issue
 - corporate action 반영 결과 확인
 
-## 23. 미결정 사항
+## 23. 구현 기본 결정 사항
 
-1. 국내 주식 세금/수수료 상세 계산 범위
-2. 환율 source와 환율 적용 시각
-3. 수수료/세금 배분의 소수점 반올림 규칙
-4. corporate action 반영 시 lot versioning 방식
-5. 주문 체결 전 reservation lot 도입 여부
-6. broker별 실현손익 제공값과 내부 FIFO 손익 차이 처리 방식
-7. simulation 계좌의 세금 계산을 실계좌와 동일하게 보여줄지 여부
-8. 미실현손익 snapshot 저장 주기
+1. 국내 주식 세금/수수료는 broker 실제 응답을 우선 저장하고, preview는 configurable fee/tax rule을 사용한다.
+2. 환율은 실제 체결 broker 환율을 우선하고, 없으면 서울외국환중개 매매기준율, 한국은행 ECOS 순으로 fallback한다.
+3. 수수료/세금 배분은 수량 비례 배분 후 KRW 1원 단위 half-up, USD 0.01 단위 half-up으로 반올림한다.
+4. corporate action은 원본 lot을 수정하지 않고 `lot_adjustment_event`와 새 lot version으로 반영한다.
+5. 주문 체결 전 reservation lot은 MVP에서 도입하지 않는다.
+6. broker 제공 실현손익은 참고값으로 저장하고 내부 FIFO 손익을 기준값으로 사용한다.
+7. simulation 계좌도 실계좌와 동일한 세금 preview를 표시하되 신고용 flag는 항상 false로 둔다.
+8. 미실현손익 snapshot은 장 종료 후 1회와 주문/체결 후 on-demand로 저장한다.
 
 ## 23.1 결정 반영 사항
 

@@ -818,14 +818,14 @@ POST /client-alerts/{client_alert_id}/ack
 | NFR-REL-005 | 16, 23 |
 | NFR-OBS-004 | 20 |
 
-## 27. 미결정 사항
+## 27. 구현 기본 결정 사항
 
-1. MVP에서 사용할 공식 공시/규제 source의 정확한 목록
-2. LSEG/Bloomberg/FactSet/Dow Jones 등 전문 뉴스 계약 provider의 우선순위와 계약 조건
-3. AI 요약/번역 모델의 운영 승인 기준
-4. source rank 초기값과 calibration 방식
-5. 수동 검토 queue 담당자와 SLA
-6. WebSocket과 SSE 중 기본 실시간 전달 방식
+1. MVP 공식 source는 OpenDART, KRX/KIND, SEC EDGAR, Federal Reserve RSS, ECB RSS, OFAC, UN sanctions, EIA, CISA, WHO, USGS를 우선 등록한다.
+2. 전문 뉴스 계약 provider 우선순위는 LSEG/Reuters, Bloomberg, FactSet, Dow Jones 순으로 둔다.
+3. AI 요약/번역은 MVP에서 저장/표시하지 않고, 후속 승인 전까지 비활성화한다.
+4. source rank 초기값은 공식/거래소 100, regulator 95, 전문 뉴스 90, 공개 verified 60으로 둔다.
+5. 수동 검토 queue SLA는 crisis 5분, danger 15분, caution 1시간으로 둔다.
+6. 실시간 전달은 WebSocket primary, SSE fallback으로 둔다.
 
 ## 27.1 결정 반영 사항
 

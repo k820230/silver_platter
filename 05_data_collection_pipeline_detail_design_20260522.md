@@ -710,18 +710,18 @@ provider_id
 
 이 순서로 진행하면 주문/리스크 구현 전에 데이터 신뢰성의 최소 기반을 먼저 확보할 수 있다.
 
-## 22. 미결정 사항
+## 22. 구현 기본 결정 사항
 
-1. raw data 저장 루트와 파일 보존 기간
-2. provider별 초기 우선순위: 무료로 가능한 KRX/Koscom/공개 API 조합의 세부 API 선정
-3. 환율 provider와 세금 계산용 환율 기준
-4. 실시간 시세 provider와 재배포 권한
-5. Parquet dataset versioning 방식
-6. data quality issue가 주문 차단으로 전파되는 API 계약
-7. Redis Streams와 pub/sub 중 MVP 기본값
-8. worker queue 구현: Redis queue, RQ, Celery, custom scheduler 중 선택
-9. 공시 영향 예측 trigger를 동기/비동기 중 어디에 둘지
-10. provider별 schema 변경 감지 자동화 수준
+1. raw data 저장 루트는 `/home/jhkim5/silver_platter_data/raw`, 보존 기간은 3년으로 한다.
+2. provider 우선순위는 KRX/Koscom 무료 가능 데이터, OpenDART/KRX KIND, SEC EDGAR, ECOS/FRED 순으로 둔다.
+3. 환율은 실제 체결 broker 환율, preview는 한국투자증권 현재 환율, 세금 보조는 서울외국환중개 매매기준율, fallback 한국은행 ECOS를 사용한다.
+4. 실시간 시세는 한국투자증권 제공 범위를 우선 사용하고, 외부 재배포는 하지 않는다.
+5. Parquet dataset은 `dataset_name/version=YYYYMMDDHHmm` 경로로 versioning한다.
+6. `quality_status=risk`는 주문 preview와 자동주문을 차단하고, `degraded`는 warning으로 전파한다.
+7. MVP event bus는 Redis Streams를 사용한다.
+8. worker queue는 RQ를 사용하고 scheduler는 APScheduler를 사용한다.
+9. 공시 영향 예측 trigger는 비동기 worker job으로 실행한다.
+10. provider schema 변경은 일 1회 contract test와 실패 알림으로 감지한다.
 
 ## 23. 다음 작업
 

@@ -33,7 +33,7 @@
 - 고빈도 orderbook 변동성 모델
 - 외부 상용 위험 모델 복제
 
-옵션 implied volatility와 ML 예측 변동성 포함 여부는 사용자 추가 확인 후 확장한다.
+옵션 implied volatility는 MVP에서 제외하고 후속 확장으로 둔다. ML 예측 변동성은 신뢰도 기준을 통과한 경우에만 위험도 구성요소로 사용한다.
 
 ## 3. 지수 설계 원칙
 
@@ -296,7 +296,7 @@ price_bar 적재
 - 지수 변화율
 - peer 괴리
 
-hard gate 여부는 리스크 한도 설정에서 결정한다. 현재 미확정인 종목별/섹터별/통화별/일일손실/MDD 한도 숫자가 확정되면 지수 threshold와 결합한다.
+hard gate 여부는 24번 결정 레지스터의 종목별/섹터별/통화별/일일손실/MDD 한도 숫자와 지수 threshold를 결합해 결정한다.
 
 ## 13. 데이터 품질
 
@@ -321,14 +321,14 @@ hard gate 여부는 리스크 한도 설정에서 결정한다. 현재 미확정
 | 이벤트 주석 | 공시/헤드라인 marker 연결 |
 | 주문창 전달 | 최신 지수 조회와 경고 표시 |
 
-## 15. 미결정 사항
+## 15. 구현 기본 결정 사항
 
-1. MVP 산식을 단순 EWMA만 사용할지, 옵션 implied volatility와 ML 예측 변동성을 함께 사용할지
-2. EWMA lambda와 lookback window 최종값
-3. 위험도 구성요소별 가중치 최종값
-4. danger/crisis threshold 최종값
-5. peer 비교 기준: 표준 산업분류, 내부 사업 그룹, 수동 peer 중 우선순위
-6. 장중 지수 갱신 주기
+1. MVP 변동성 산식은 EWMA V1로 시작하고 옵션 implied volatility는 제외한다.
+2. EWMA lambda는 0.94, lookback window는 252거래일이다.
+3. 위험도 구성요소 가중치는 변동성 25, 낙폭 20, 유동성 15, 이벤트 20, 그룹 10, ML 10이다.
+4. alert 기준은 danger 70점 이상, crisis 85점 이상이다.
+5. peer 비교 우선순위는 수동 peer, 내부 사업 그룹, 표준 산업분류 순이다.
+6. 장중 지수는 5분 간격 incremental, 장 종료 후 full recompute로 갱신한다.
 
 ## 16. 다음 산출물
 

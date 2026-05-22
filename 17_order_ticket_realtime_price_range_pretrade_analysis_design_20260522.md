@@ -119,6 +119,13 @@ else:
     applied_slippage_bps = base_slippage_bps
 ```
 
+MVP 유동성 hard gate는 주문금액이 해당 종목의 20거래일 평균 거래대금의 5%를 초과하는지 검사한다.
+
+```text
+if order_amount_krw / avg_daily_turnover_20d_krw > 0.05:
+    block_order("LIQUIDITY_LIMIT_EXCEEDED")
+```
+
 주문창에는 "평균 거래대금 기준 저유동성 종목으로 기준 슬리피지의 3배 적용"을 명확히 표시한다.
 
 ## 8. horizon별 가격 범위
@@ -329,14 +336,14 @@ tick마다 전체 모델 계산을 다시 수행하지 않고, 최신 예측 결
 | simulation | 실제 broker 미전송 |
 | 리스크 경고 | 수동 확인과 감사 로그 |
 
-## 18. 미결정 사항
+## 18. 구현 기본 결정 사항
 
-1. 평균 거래대금 기준 저유동성 threshold
-2. 기본 슬리피지 bps 초기값
-3. 사용자 지정 horizon의 최대 기간
-4. 주문창 preview cache TTL
-5. 주문 전 수동 확인이 필요한 warning 목록
-6. 환율 source 우선순위
+1. 평균 거래대금 기준 저유동성 절대 하한은 20거래일 평균 거래대금 원화 환산 1,000,000,000원 미만이다.
+2. 기본 슬리피지는 한국 시장가 10bps/지정가 5bps, 미국 시장가 8bps/지정가 4bps다.
+3. 사용자 지정 horizon 최대 기간은 1년이다.
+4. 주문창 preview cache TTL은 3초이며 tick 수신 시 즉시 무효화한다.
+5. danger 이상 위험도, 공시 예상 하락 하한 -5% 이하, 유동성 degraded, 환율 pending은 수동 확인 warning으로 둔다.
+6. 환율 source 우선순위는 broker 적용 환율, 한국투자증권 현재 환율, 서울외국환중개, 한국은행 ECOS 순이다.
 
 ## 19. 다음 산출물
 

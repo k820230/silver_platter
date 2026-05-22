@@ -669,9 +669,9 @@ strategy signal
 | 모니터링 | Prometheus + Grafana |
 | 백업 | 매주 토요일 10:00 KST Goldilocks 정기 백업 |
 
-## 17. 미결정 사항
+## 17. 구현 기본 결정 사항
 
-다음 항목은 후속 설계서에서 확정한다.
+다음 항목은 24번 결정 레지스터의 MVP 기본값을 따른다.
 
 1. Goldilocks 운영 방식: host service 직접 연결 또는 Compose service 연동
 2. Goldilocks backup 명령과 파일 형식
@@ -687,7 +687,7 @@ strategy signal
 - 초기 실거래 broker adapter는 한국투자증권 Open API로 한다.
 - 별도 해외 브로커는 사용하지 않는다.
 - PC 서버는 개발용과 장기 운영용을 겸한다.
-- 외부 모바일 접속 방식은 추후 결정한다.
+- 외부 모바일 접속은 MVP에서 내부망 Web/PWA 조회만 허용하고, 모바일 신규 live 주문은 비활성화한다.
 - 정기 백업은 `/home/jhkim5/backup_sp/{backup_date}/`에 무기한 보존하고 암호화하지 않는다.
 
 ## 18. 다음 작업

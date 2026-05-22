@@ -671,22 +671,22 @@ new disclosure
 - 정정 공시 처리 품질
 - 사업 그룹별 성능 편차
 
-## 21. 미결정 사항
+## 21. 구현 기본 결정 사항
 
-1. MVP 공시 source 범위: OpenDART/KRX/KIND/SEC EDGAR 중 1차 구현 source
-2. 국내 공시 유형 taxonomy의 초기 granularity
-3. SEC filing type과 내부 공시 유형 매핑
-4. 분봉 데이터 없는 종목의 intraday window 처리
-5. text embedding 도입 시점
-6. 공시 본문 저장 범위와 라이선스 정책
-7. 유사 사례 최소 개수 기준
-8. 주문창 경고 임계값
-9. 공시 영향 예측을 리스크 한도에 반영하는 공식
-10. 예측 결과 보존 기간과 재학습 dataset 편입 기준
+1. MVP 공시 source는 OpenDART, KRX/KIND, SEC EDGAR를 모두 포함한다.
+2. 초기 taxonomy는 earnings, guidance, capital, M&A, contract, litigation, regulatory, buyback/dividend, ownership, listing/trading_halt, other로 둔다.
+3. SEC filing type은 8-K, 10-Q, 10-K, S-1, 13D/G, Form 4를 내부 taxonomy에 우선 매핑한다.
+4. 분봉 데이터가 없으면 intraday window는 계산하지 않고 일봉 window만 사용한다.
+5. text embedding은 MVP P2로 두고 초기에는 taxonomy와 key numeric extraction을 우선한다.
+6. 공시 본문은 공식 source 원문 링크와 metadata를 저장하고, 본문 전문 저장은 라이선스 허용 범위에서만 한다.
+7. 유사 사례 최소 기준은 20건, 5~19건은 degraded, 5건 미만은 예측 보류다.
+8. 주문창 경고는 예상 하락 하한 -5% 또는 risk score 70 이상이면 표시한다.
+9. 공시 영향은 risk score에 최대 20점까지 가산한다.
+10. 예측 결과는 5년 보존하고 실제 반응 관측 후 재학습 dataset에 편입한다.
 
 ## 21.1 결정 반영 사항
 
-- 공시 영향 분석은 OpenDART, KRX/KIND, SEC EDGAR를 후보 source로 두고 MVP 대상 source를 후속 단계에서 다시 확정한다.
+- 공시 영향 분석 MVP source는 OpenDART, KRX/KIND, SEC EDGAR 모두로 확정한다.
 - MVP 설계에는 공시 유형 taxonomy, 가격 반응 window, 유사 사례 산정 방식을 반드시 포함한다.
 
 ## 22. 다음 작업
