@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+API_URL="${API_URL:-http://localhost:8000}"
+STAMP="$(date +%s)"
+
+curl -fsS "${API_URL}/health" >/dev/null
+
+curl -fsS -X POST "${API_URL}/api/data/price-bars/quality" \
+  -H 'Content-Type: application/json' \
+  -d '{"bars":[{"security_id":"AAPL","bar_ts":"2026-05-22T09:00:00","close_price":200.0,"volume":1000,"turnover_krw":200000,"available_to_model_at":"2026-05-22T09:00:00"}]}' >/dev/null
+
+curl -fsS -X POST "${API_URL}/api/orders/submit" \
+  -H 'Content-Type: application/json' \
+  -d "{\"order_id\":\"smoke-${STAMP}\",\"account_id\":\"a1\",\"security_id\":\"AAPL\",\"side\":\"buy\",\"order_type\":\"limit\",\"market\":\"US\",\"current_price\":10000,\"quantity\":20,\"avg_daily_turnover_20d_krw\":100000000,\"idempotency_key\":\"smoke-${STAMP}\",\"broker_code\":\"paper\",\"limit_price\":10000}" >/dev/null
+
+curl -fsS -X POST "${API_URL}/api/ml/jobs/run" \
+  -H 'Content-Type: application/json' \
+  -d '{"job_id":"smoke-ml","snapshot":{"security_id":"AAPL","as_of":"2026-05-22T09:00:00","last_price":200,"avg_volume_20d":50000000,"annualized_volatility":0.3,"risk_score":35},"horizons":["1d"]}' >/dev/null
+
+curl -fsS -X POST "${API_URL}/api/scenarios/shock" \
+  -H 'Content-Type: application/json' \
+  -d '{"scenario_id":"smoke-s1","name":"market drop","current_price":100,"fx_rate":1300,"avg_daily_turnover_20d_krw":1000000000,"price_shock_pct":-0.1,"fx_shock_pct":0.08,"liquidity_multiplier":0.5}' >/dev/null
+
+curl -fsS -X POST "${API_URL}/api/operations/summary" \
+  -H 'Content-Type: application/json' \
+  -d '{"components":[{"component":"api","status":"ok","detail":"ready","checked_at":"2026-05-22T10:00:00"}]}' >/dev/null
+
+echo "API smoke checks passed for ${API_URL}"

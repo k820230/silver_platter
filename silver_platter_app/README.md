@@ -17,6 +17,11 @@ All project artifacts are managed under `/home/jhkim5/silver_platter`. Do not cr
 - Disclosure impact preview helper
 - FIFO realized PnL and overseas stock capital gains tax support estimate helper
 - Data provider interface, reference/disclosure/FX ingestion helpers, quality manifest, and partitioned export helper
+- Execution posting, broker reconciliation, order state machine, idempotency, paper/KIS broker boundary, kill switch, and event-risk controls
+- Watchlist, ML prediction job, prediction actual/error tracking, and volatility/risk index chart helpers
+- Backtest/replay lookahead guard, scenario shock helper, and backup manifest/restore-check helpers
+- Audit log and operations summary helpers
+- Verification gate/evidence assessment helper
 
 ## Local Commands
 
@@ -25,6 +30,7 @@ cd /home/jhkim5/silver_platter/silver_platter_app
 ./scripts/test
 ./scripts/lint
 ./scripts/check
+./scripts/smoke_api
 ./scripts/migrate status
 ./scripts/migrate render
 docker-compose config

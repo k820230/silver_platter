@@ -60,7 +60,8 @@ body {
 
 .metric-card,
 .order-ticket,
-.chart-panel {
+.chart-panel,
+.wide-panel {
   background: #ffffff;
   border: 1px solid #dce3e8;
   border-radius: 8px;
@@ -97,7 +98,8 @@ body {
 }
 
 .order-ticket,
-.chart-panel {
+.chart-panel,
+.wide-panel {
   padding: 18px;
 }
 
@@ -106,7 +108,8 @@ body {
 }
 
 .order-ticket header,
-.chart-panel header {
+.chart-panel header,
+.wide-panel header {
   align-items: center;
   display: flex;
   justify-content: space-between;
@@ -114,7 +117,8 @@ body {
 }
 
 .order-ticket h1,
-.chart-panel h2 {
+.chart-panel h2,
+.wide-panel h2 {
   font-size: 16px;
   margin: 0;
 }
@@ -232,6 +236,50 @@ select {
   display: flex;
   justify-content: space-between;
   min-height: 28px;
+}
+
+.wide-panel {
+  min-height: 160px;
+}
+
+.ops-grid,
+.audit-list {
+  display: grid;
+  gap: 10px;
+}
+
+.ops-row,
+.audit-row {
+  align-items: center;
+  border-bottom: 1px solid #edf1f4;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: 1fr 76px 96px;
+  min-height: 32px;
+}
+
+.ops-row:last-child,
+.audit-row:last-child {
+  border-bottom: 0;
+}
+
+.ops-row span,
+.audit-row span {
+  color: #59656e;
+  font-size: 12px;
+}
+
+.ops-row strong,
+.audit-row strong {
+  font-size: 13px;
+}
+
+.ops-row em,
+.audit-row em {
+  color: #59656e;
+  font-size: 12px;
+  font-style: normal;
+  text-align: right;
 }
 
 @media (max-width: 760px) {

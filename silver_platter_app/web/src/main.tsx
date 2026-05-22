@@ -4,10 +4,13 @@ import {
   Activity,
   AlertTriangle,
   BarChart3,
+  ClipboardList,
   Database,
   LineChart,
   ReceiptText,
+  ServerCog,
   ShieldCheck,
+  TestTube2,
 } from "lucide-react";
 import "./styles.css";
 
@@ -22,6 +25,19 @@ const priceRanges = [
   { horizon: "1W", low: "75,600", mid: "80,100", high: "84,700" },
   { horizon: "1M", low: "70,200", mid: "80,100", high: "90,500" },
   { horizon: "3M", low: "62,900", mid: "80,100", high: "98,400" },
+];
+
+const operations = [
+  { name: "Provider Quality", status: "OK", detail: "34 checks" },
+  { name: "Order State", status: "Ready", detail: "8 transitions" },
+  { name: "Backtest", status: "OK", detail: "No lookahead" },
+  { name: "Backup", status: "Watch", detail: "Manifest only" },
+];
+
+const auditEvents = [
+  { time: "09:00", action: "ORDER_PREVIEW", target: "005930.KS" },
+  { time: "09:04", action: "RISK_CHECK", target: "pass" },
+  { time: "09:11", action: "BACKTEST_RUN", target: "bt-1" },
 ];
 
 function App() {
@@ -57,6 +73,16 @@ function App() {
           <ReceiptText size={18} />
           <span>Tax Estimate</span>
           <strong>440,000 KRW</strong>
+        </article>
+        <article className="metric-card">
+          <TestTube2 size={18} />
+          <span>Backtest</span>
+          <strong>54 Tests</strong>
+        </article>
+        <article className="metric-card">
+          <ServerCog size={18} />
+          <span>Operations</span>
+          <strong>Degraded</strong>
         </article>
       </section>
 
@@ -152,6 +178,38 @@ function App() {
               <dd>37.6</dd>
             </div>
           </dl>
+        </article>
+
+        <article className="wide-panel">
+          <header>
+            <h2>Operations</h2>
+            <ServerCog size={18} />
+          </header>
+          <div className="ops-grid">
+            {operations.map((item) => (
+              <div className="ops-row" key={item.name}>
+                <span>{item.name}</span>
+                <strong>{item.status}</strong>
+                <em>{item.detail}</em>
+              </div>
+            ))}
+          </div>
+        </article>
+
+        <article className="wide-panel">
+          <header>
+            <h2>Audit</h2>
+            <ClipboardList size={18} />
+          </header>
+          <div className="audit-list">
+            {auditEvents.map((event) => (
+              <div className="audit-row" key={`${event.time}-${event.action}`}>
+                <span>{event.time}</span>
+                <strong>{event.action}</strong>
+                <em>{event.target}</em>
+              </div>
+            ))}
+          </div>
         </article>
       </section>
     </main>
