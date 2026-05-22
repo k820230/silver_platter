@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+cd "$(dirname "$0")/.."
+PYTHONPATH=src python3 -m silver_platter.migrations render | grep -E "order_to_adv20|weekly_goldilocks_full_backup|korea_investment" >/dev/null
+echo "seed render contains expected MVP policy values"

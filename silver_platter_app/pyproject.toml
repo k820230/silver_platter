@@ -1,0 +1,31 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "silver-platter"
+version = "0.1.0"
+description = "Quant-based stock trading MVP skeleton"
+requires-python = ">=3.8"
+dependencies = []
+
+[project.optional-dependencies]
+api = [
+  "fastapi>=0.100",
+  "uvicorn[standard]>=0.23",
+]
+worker = [
+  "redis>=5",
+  "rq>=1.15",
+  "apscheduler>=3.10",
+]
+dev = [
+  "fastapi>=0.100",
+  "uvicorn[standard]>=0.23",
+  "redis>=5",
+  "rq>=1.15",
+  "apscheduler>=3.10",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]

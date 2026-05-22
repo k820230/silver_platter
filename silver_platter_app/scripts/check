@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+cd "$(dirname "$0")/.."
+
+./scripts/lint
+./scripts/test
+./scripts/migrate status
+./scripts/seed_verify
+
+if command -v docker-compose >/dev/null 2>&1; then
+  docker-compose config >/dev/null
+elif docker compose version >/dev/null 2>&1; then
+  docker compose config >/dev/null
+else
+  echo "docker compose is not installed; skipping compose config validation" >&2
+fi
+
+if [ -d web/node_modules ]; then
+  npm --prefix web run build
+else
+  echo "web/node_modules is missing; run npm --prefix web install before web build validation" >&2
+fi
