@@ -52,6 +52,12 @@
 - paper broker adapter
 - 한국투자증권 adapter boundary
 - live order disabled 기본값
+- 한국투자증권 OAuth token request mapping
+- 한국투자증권 국내주식 현금주문 payload mapping
+- 한국투자증권 매수가능조회/orderability query mapping
+- `scripts/kis_orderable_smoke` read-only smoke
+- live mode에서도 credential/transport 누락 시 broker 전송 전 rejected
+- 국내주식 외 market은 broker 전송 전 rejected
 - risk preview 후 broker submit
 - paper adapter는 broker 전송 없이 accepted 처리
 - KIS adapter는 live disabled 시 rejected 처리
@@ -98,6 +104,14 @@
 - `reconciliation_run`
 - `audit_log`
 
+### 3.7 Repository writer
+
+추가 기능:
+
+- `order_state_event` insert
+- `order_idempotency_key` insert
+- `audit_log` insert
+
 ## 4. 테스트
 
 추가 테스트:
@@ -116,15 +130,21 @@
 - idempotency duplicate 차단
 - paper broker live 미전송
 - KIS live disabled rejected
+- KIS live mode credential/transport guard
+- KIS domestic cash order OAuth/order payload mapping
+- KIS orderability OAuth/query payload mapping
+- KIS HTTP transport JSON POST 검증
+- KIS unsupported market pre-send rejection
+- order state/idempotency/audit repository SQL generation
 - kill switch block
 - event risk warning과 expired signal 무시
 
 ## 5. 남은 실제 연동
 
-- Goldilocks writer와 transaction boundary
+- Goldilocks 실제 transaction boundary smoke
 - broker execution 원본 response 저장
-- 주문 상태 event append-only 저장
-- KIS OAuth와 orderable API 확인
+- 주문 상태 event 실제 Goldilocks append smoke
+- KIS credentials 설정 후 실제 매수가능조회 smoke
 - live order 수동 승인 workflow
 - kill switch UI와 audit log 조회
 

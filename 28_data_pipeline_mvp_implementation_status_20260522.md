@@ -25,14 +25,51 @@
 - 공시 metadata provider interface
 - 환율 provider interface
 - static provider test double
+- CSV FX rate provider
 - MVP provider catalog
+- KRX Data Marketplace daily price connector
+  - `data.krx.co.kr` OTP/download CSV 호출 경로
+  - KRX 일별 종목 시세 table `MDCSTAT01501`
+  - 종목코드/종가/거래량/거래대금 normalization
+  - 장마감 이후 사용 가능 시각 `16:00` 고정으로 lookahead guard 연동
+- `scripts/krx_price_smoke` read-only network smoke, opt-in 기본 skip
+- SEC EDGAR submissions metadata connector
+  - `data.sec.gov/submissions/CIK##########.json` 호출 경로
+  - User-Agent 선언 필수 검증
+  - ticker -> CIK lookup 주입
+  - form type filtering
+  - accession/archive index URL 정규화
+  - filing metadata만 저장하고 본문은 저장하지 않음
+- `scripts/sec_edgar_smoke` read-only network smoke
+- OpenDART disclosure search metadata connector
+  - `opendart.fss.or.kr/api/list.json` 호출 경로
+  - API key 필수 검증
+  - symbol -> corp_code lookup 주입
+  - 날짜 범위 filtering
+  - DART receipt URL 정규화
+- `scripts/opendart_smoke` read-only network smoke
+- KRX KIND disclosure search metadata connector
+  - `kind.krx.co.kr/disclosure/searchdisclosurebycorp.do` 회사별검색 호출 경로
+  - KIND HTML table parser
+  - row number/time/company/title/filer normalization
+  - title link source URL 보존
+- `scripts/krx_kind_smoke` read-only network smoke, opt-in 기본 skip
+- 한국은행 ECOS FX rate connector
+  - `ecos.bok.or.kr/api/StatisticSearch` 호출 경로
+  - 주요국 통화의 대원화환율 기본 통계코드 `731Y001`
+  - USD/KRW, JPY/KRW, EUR/KRW 기본 item code mapping
+  - ECOS `TIME`, `DATA_VALUE` row normalization
+- `scripts/ecos_fx_smoke` read-only network smoke, `ECOS_API_KEY` 미설정 시 기본 skip
+- `scripts/provider_smoke` guarded provider smoke suite
 
 MVP catalog에는 다음 source가 포함된다.
 
 - `krx_free`
+- `krx_data`
 - `opendart`
 - `krx_kind`
 - `sec_edgar`
+- `ecos_bok`
 - `free_fx_placeholder`
 
 ### 3.2 Ingestion 결과와 raw manifest
@@ -76,6 +113,7 @@ MVP catalog에는 다음 source가 포함된다.
 - `pyarrow` 미설치 환경에서는 `jsonl` fallback
 - export file별 SHA-256 checksum
 - DuckDB/분석 pipeline 연결을 위한 partition 구조
+- exported snapshot file에서 가격 bar 재로딩
 
 ### 3.5 API
 
@@ -86,6 +124,28 @@ MVP catalog에는 다음 source가 포함된다.
 용도:
 
 - provider 수집 직후 가격 bar 품질 상태를 API로 확인
+
+### 3.6 Goldilocks repository writer
+
+추가 파일:
+
+- `src/silver_platter/repository.py`
+
+구현 항목:
+
+- `data_provider` idempotent insert
+- `security_master` market/symbol 기준 idempotent insert
+- `provider_symbol_map` insert
+- `raw_data_manifest` insert
+- `data_quality_run` insert
+- `price_bar` insert
+- `audit_log` insert
+- `order_state_event` insert
+- `order_idempotency_key` insert
+- `backtest_run`, `backtest_order_event`, `backtest_metric` insert
+- `verification_gate_assessment`, `verification_gate_evidence` insert
+- `alert_delivery_run` insert
+- 가격 bar ingestion 결과를 manifest, quality, canonical bar로 저장하는 writer method
 
 ## 4. 테스트
 
@@ -99,20 +159,31 @@ MVP catalog에는 다음 source가 포함된다.
 
 - MVP provider catalog
 - static reference/disclosure/FX provider filtering
+- KRX daily price CSV normalization
+- SEC EDGAR submission metadata normalization
+- OpenDART disclosure metadata normalization
+- KRX KIND disclosure HTML normalization
+- ECOS FX rate metadata normalization
+- CSV FX rate provider loading and required-column validation
+- Goldilocks repository SQL command generation
+- audit/order/backtest repository SQL command generation
+- verification/alert repository SQL command generation
 - price bar ingestion quality와 manifest 생성
 - raw manifest digest 안정성
 - partitioned export 파일 생성과 checksum
+- exported snapshot round-trip 로딩
 
 ## 5. 남은 실제 연동
 
 이번 작업은 adapter contract와 local pipeline foundation이다. 다음 항목은 실제 provider별 API credential, rate limit, 데이터 포맷 확인 후 연결한다.
 
-- KRX/Koscom 무료 데이터 source connector
-- OpenDART 수집 connector
-- KRX KIND 수집 connector
-- SEC EDGAR 수집 connector
-- 환율 source connector
-- Goldilocks load writer
+- KRX Data Marketplace daily price network smoke는 script 준비 완료, 현재 환경은 opt-in disabled
+- OpenDART network smoke는 script 준비 완료, 현재 환경은 API key 없음
+- KRX KIND network smoke는 script 준비 완료, 현재 환경은 opt-in disabled
+- SEC EDGAR network smoke는 script 준비 완료, 현재 환경은 placeholder User-Agent라 skip
+- ECOS FX network smoke는 script 준비 완료, 현재 환경은 API key 없음
+- Goldilocks 실제 ODBC connection 대상 writer smoke
+  - `scripts/goldilocks_repository_smoke` 준비 완료, 기본은 rollback-only smoke opt-in 전 skip
 - parquet dependency 선택과 운영 이미지 반영
 
 ## 6. 검증 명령

@@ -46,6 +46,35 @@ class GoldilocksSettings:
 
 
 @dataclass(frozen=True)
+class KoreaInvestmentSettings:
+    app_key: str
+    app_secret: str
+    account_number: str
+    account_product_code: str
+    api_base_url: str
+    trading_env: str
+
+    def configured_for_queries(self) -> bool:
+        return bool(
+            self.app_key
+            and self.app_secret
+            and self.account_number
+            and self.api_base_url
+        )
+
+    def redacted(self) -> dict:
+        return {
+            "app_key": "***" if self.app_key else "",
+            "app_secret": "***" if self.app_secret else "",
+            "account_number": "***" if self.account_number else "",
+            "account_product_code": self.account_product_code,
+            "api_base_url": self.api_base_url,
+            "trading_env": self.trading_env,
+            "configured_for_queries": self.configured_for_queries(),
+        }
+
+
+@dataclass(frozen=True)
 class AppSettings:
     app_env: str
     app_timezone: str
@@ -56,6 +85,13 @@ class AppSettings:
     raw_data_dir: str
     log_dir: str
     model_artifact_dir: str
+    alert_webhook_url: str
+    sec_edgar_user_agent: str
+    opendart_api_key: str
+    ecos_api_key: str
+    krx_kind_smoke_enabled: bool
+    krx_price_smoke_enabled: bool
+    kis: KoreaInvestmentSettings
     live_order_enabled: bool
     simulation_order_broker_send: bool
 
@@ -87,6 +123,23 @@ class AppSettings:
             model_artifact_dir=os.getenv(
                 "MODEL_ARTIFACT_DIR", "/home/jhkim5/silver_platter_models"
             ),
+            alert_webhook_url=os.getenv("ALERT_WEBHOOK_URL", ""),
+            sec_edgar_user_agent=os.getenv(
+                "SEC_EDGAR_USER_AGENT",
+                "Silver Platter admin@example.com",
+            ),
+            opendart_api_key=os.getenv("OPENDART_API_KEY", ""),
+            ecos_api_key=os.getenv("ECOS_API_KEY", ""),
+            krx_kind_smoke_enabled=_bool_from_env("KRX_KIND_SMOKE_ENABLED", False),
+            krx_price_smoke_enabled=_bool_from_env("KRX_PRICE_SMOKE_ENABLED", False),
+            kis=KoreaInvestmentSettings(
+                app_key=os.getenv("KIS_APP_KEY", ""),
+                app_secret=os.getenv("KIS_APP_SECRET", ""),
+                account_number=os.getenv("KIS_ACCOUNT_NO", ""),
+                account_product_code=os.getenv("KIS_ACCOUNT_PRODUCT_CODE", "01"),
+                api_base_url=os.getenv("KIS_API_BASE_URL", ""),
+                trading_env=os.getenv("KIS_TRADING_ENV", "demo"),
+            ),
             live_order_enabled=_bool_from_env("LIVE_ORDER_ENABLED", False),
             simulation_order_broker_send=_bool_from_env(
                 "SIMULATION_ORDER_BROKER_SEND", False
@@ -104,6 +157,13 @@ class AppSettings:
             "raw_data_dir": self.raw_data_dir,
             "log_dir": self.log_dir,
             "model_artifact_dir": self.model_artifact_dir,
+            "alert_webhook_url": self.alert_webhook_url,
+            "sec_edgar_user_agent": self.sec_edgar_user_agent,
+            "opendart_api_key": "***" if self.opendart_api_key else "",
+            "ecos_api_key": "***" if self.ecos_api_key else "",
+            "krx_kind_smoke_enabled": self.krx_kind_smoke_enabled,
+            "krx_price_smoke_enabled": self.krx_price_smoke_enabled,
+            "kis": self.kis.redacted(),
             "live_order_enabled": self.live_order_enabled,
             "simulation_order_broker_send": self.simulation_order_broker_send,
         }

@@ -10,17 +10,22 @@ All project artifacts are managed under `/home/jhkim5/silver_platter`. Do not cr
 - Wave 1 Goldilocks schema foundation skeleton
 - MVP risk rule engine skeleton
 - Order preview skeleton
-- API, worker, scheduler, and Web UI startup skeletons
+- API, worker, scheduler, and API-bound Web UI with order, operations, backtest, and strategy parameter controls
 - Business group assignment, group risk, and normalized volatility comparison helpers
-- Trusted headline filtering and geopolitical event alert helper
+- Trusted headline filtering, headline dedup clustering, headline-to-risk-signal bridge, and geopolitical event alert helper
+- Federal Reserve and ECB official RSS headline metadata connector
+- OFAC Recent Actions headline metadata connector
 - User-designated security ML forecast baseline
 - Disclosure impact preview helper
 - FIFO realized PnL and overseas stock capital gains tax support estimate helper
-- Data provider interface, reference/disclosure/FX ingestion helpers, quality manifest, and partitioned export helper
-- Execution posting, broker reconciliation, order state machine, idempotency, paper/KIS broker boundary, kill switch, and event-risk controls
+- Data provider interface, reference/disclosure/FX ingestion helpers, KRX daily price, CSV and ECOS BOK FX providers, quality manifest, partitioned export helper, and exported snapshot loader/replay runner
+- SEC EDGAR and OpenDART disclosure metadata connectors with guarded smoke scripts
+- Goldilocks repository writer for provider, security, manifest, quality, price bar, audit, headline, order state, backtest, scenario, restore check, verification gate, and alert delivery rows
+- Execution posting, broker reconciliation, order state machine, idempotency, paper/KIS guarded broker boundary with orderability query smoke, kill switch, and event-risk controls
 - Watchlist, ML prediction job, prediction actual/error tracking, and volatility/risk index chart helpers
-- Backtest/replay lookahead guard, scenario shock helper, and backup manifest/restore-check helpers
-- Audit log and operations summary helpers
+- Backtest/replay lookahead guard, strategy plugin registry, exported snapshot replay runner, paper replay evidence, scenario shock helper, backup manifest/restore-check/status helpers, backup execution lock, and backup/restore scheduler helpers
+- API boundary checks for strategy, replay, and headline risk signal input errors
+- Audit log, operations summary, provider health/catalog with license-policy detail, and alert delivery helpers
 - Verification gate/evidence assessment helper
 
 ## Local Commands
@@ -33,12 +38,41 @@ cd /home/jhkim5/silver_platter/silver_platter_app
 ./scripts/smoke_api
 ./scripts/migrate status
 ./scripts/migrate render
+./scripts/migrate plan
+./scripts/migrate apply --dry-run
+./scripts/migrate apply
+./scripts/replay_exported_snapshot --help
+./scripts/goldilocks_odbc_smoke
+./scripts/goldilocks_repository_smoke
+./scripts/kis_orderable_smoke
+./scripts/sec_edgar_smoke
+./scripts/opendart_smoke
+./scripts/krx_kind_smoke
+./scripts/krx_price_smoke
+./scripts/ecos_fx_smoke
+./scripts/official_rss_smoke
+./scripts/ofac_recent_actions_smoke
+./scripts/provider_smoke
+./scripts/alert_webhook_smoke
 docker-compose config
 npm --prefix web install
 npm --prefix web run build
 ```
 
 For local secrets, create an untracked `.env` and pass it explicitly with `docker-compose --env-file .env ...` or keep secrets in the host environment.
+`./scripts/migrate apply` requires a Goldilocks ODBC configuration via `GOLDILOCKS_ODBC_CONNECT_STRING`, `GOLDILOCKS_ODBC_DSN`, or `GOLDILOCKS_ODBC_DRIVER`.
+`./scripts/goldilocks_odbc_smoke` is read-only and skips unless Goldilocks ODBC is configured.
+`./scripts/goldilocks_repository_smoke` rolls back provider/license/audit/scenario/restore/headline writer checks and skips unless `GOLDILOCKS_REPOSITORY_SMOKE_WRITE=1` plus Goldilocks ODBC are configured.
+`./scripts/kis_orderable_smoke` is read-only and skips unless KIS query credentials and `KIS_API_BASE_URL` are configured.
+`./scripts/sec_edgar_smoke` is read-only and skips unless `SEC_EDGAR_USER_AGENT` is set to a real contact User-Agent.
+`./scripts/opendart_smoke` is read-only and skips unless `OPENDART_API_KEY` is configured.
+`./scripts/krx_kind_smoke` is read-only and skips unless `KRX_KIND_SMOKE_ENABLED=1` is configured.
+`./scripts/krx_price_smoke` is read-only and skips unless `KRX_PRICE_SMOKE_ENABLED=1` is configured.
+`./scripts/ecos_fx_smoke` is read-only and skips unless `ECOS_API_KEY` is configured.
+`./scripts/official_rss_smoke` is read-only and skips unless `OFFICIAL_RSS_SMOKE_ENABLED=1` is configured.
+`./scripts/ofac_recent_actions_smoke` is read-only and skips unless `OFAC_RECENT_ACTIONS_SMOKE_ENABLED=1` is configured.
+`./scripts/provider_smoke` runs the guarded SEC EDGAR, OpenDART, KRX KIND, KRX price, ECOS FX, official RSS, and OFAC smoke checks.
+`./scripts/alert_webhook_smoke` sends one test alert and skips unless `ALERT_WEBHOOK_URL` is configured.
 
 ## MVP Defaults
 

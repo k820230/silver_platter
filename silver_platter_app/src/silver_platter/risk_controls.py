@@ -1,7 +1,8 @@
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Iterable, List, Optional, Set
 
+from silver_platter.headlines import GEOPOLITICAL_TAGS, HeadlineDedupCluster
 from silver_platter.risk import BLOCK, WARNING, RiskIssue
 
 
@@ -78,3 +79,44 @@ def evaluate_event_risk(
             )
         )
     return issues
+
+
+def headline_clusters_to_event_risk_signals(
+    clusters: Iterable[HeadlineDedupCluster],
+    expires_after: timedelta = timedelta(minutes=30),
+) -> List[EventRiskSignal]:
+    signals: List[EventRiskSignal] = []
+    for cluster in clusters:
+        tags = {
+            tag.strip().lower()
+            for headline in cluster.headlines
+            for tag in headline.event_tags
+            if tag.strip()
+        }
+        security_ids = {
+            security_id
+            for headline in cluster.headlines
+            for security_id in headline.security_ids
+        }
+        group_ids = {
+            group_id
+            for headline in cluster.headlines
+            for group_id in headline.group_ids
+        }
+        if not tags.intersection(GEOPOLITICAL_TAGS):
+            continue
+        severe_tags = {"sanction", "terror", "war"}
+        severity = "critical" if tags.intersection(severe_tags) else "warning"
+        observed_at = cluster.representative.published_at
+        signals.append(
+            EventRiskSignal(
+                event_id=cluster.cluster_id,
+                event_type="headline",
+                severity=severity,
+                observed_at=observed_at,
+                security_ids=security_ids,
+                group_ids=group_ids,
+                expires_at=observed_at + expires_after,
+            )
+        )
+    return signals

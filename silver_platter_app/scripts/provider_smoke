@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+cd "$(dirname "$0")/.."
+
+./scripts/sec_edgar_smoke
+./scripts/opendart_smoke
+./scripts/krx_kind_smoke
+./scripts/krx_price_smoke
+./scripts/ecos_fx_smoke
+./scripts/official_rss_smoke
+./scripts/ofac_recent_actions_smoke

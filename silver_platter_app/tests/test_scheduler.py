@@ -1,7 +1,13 @@
 from datetime import datetime
 from unittest import TestCase
 
-from silver_platter.worker.scheduler import MVP_BACKUP_SCHEDULE, next_weekly_run_after
+from silver_platter.worker.scheduler import (
+    MVP_BACKUP_SCHEDULE,
+    MVP_RESTORE_DRILL_SCHEDULE,
+    MonthlySchedule,
+    next_monthly_run_after,
+    next_weekly_run_after,
+)
 
 
 class SchedulerTests(TestCase):
@@ -14,3 +20,27 @@ class SchedulerTests(TestCase):
         result = next_weekly_run_after(datetime(2026, 5, 23, 10, 1, 0), MVP_BACKUP_SCHEDULE)
 
         self.assertEqual(datetime(2026, 5, 30, 10, 0, 0), result)
+
+    def test_next_monthly_run_after_returns_same_day_when_before_schedule(self):
+        result = next_monthly_run_after(
+            datetime(2026, 5, 1, 10, 0, 0),
+            MVP_RESTORE_DRILL_SCHEDULE,
+        )
+
+        self.assertEqual(datetime(2026, 5, 1, 11, 0, 0), result)
+
+    def test_next_monthly_run_after_returns_next_month_when_after_schedule(self):
+        result = next_monthly_run_after(
+            datetime(2026, 5, 1, 11, 1, 0),
+            MVP_RESTORE_DRILL_SCHEDULE,
+        )
+
+        self.assertEqual(datetime(2026, 6, 1, 11, 0, 0), result)
+
+    def test_next_monthly_run_after_clamps_to_last_day_of_short_month(self):
+        result = next_monthly_run_after(
+            datetime(2026, 1, 31, 10, 1, 0),
+            MonthlySchedule(day=31, hour=10, minute=0, timezone="Asia/Seoul"),
+        )
+
+        self.assertEqual(datetime(2026, 2, 28, 10, 0, 0), result)

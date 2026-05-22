@@ -1,0 +1,127 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+cd "$(dirname "$0")/.."
+
+if [ "${GOLDILOCKS_REPOSITORY_SMOKE_WRITE:-0}" != "1" ]; then
+  echo "Goldilocks repository smoke skipped: set GOLDILOCKS_REPOSITORY_SMOKE_WRITE=1 to run rollback-only writer checks"
+  exit 0
+fi
+
+PYTHONPATH=src python3 - <<'PY'
+from datetime import datetime
+
+from silver_platter.audit import AuditLog
+from silver_platter.backtest import ScenarioShock, apply_scenario_shock
+from silver_platter.backup import RestoreCheckResult
+from silver_platter.headlines import Headline, deduplicate_headlines
+from silver_platter.migrations import connect_goldilocks_from_env
+from silver_platter.providers import ProviderMetadata, license_policy_from_provider
+from silver_platter.repository import GoldilocksRepository
+from silver_platter.risk_controls import headline_clusters_to_event_risk_signals
+
+try:
+    connection = connect_goldilocks_from_env()
+except RuntimeError as exc:
+    message = str(exc)
+    if (
+        "GOLDILOCKS_ODBC_CONNECT_STRING" in message
+        or "pyodbc is required" in message
+    ):
+        print("Goldilocks repository smoke skipped: %s" % message)
+        raise SystemExit(0)
+    raise
+
+repository = GoldilocksRepository(connection)
+try:
+    smoke_provider = ProviderMetadata(
+        "repository_smoke_provider",
+        "headline",
+        True,
+        False,
+        False,
+        99,
+    )
+    repository.upsert_provider(
+        smoke_provider,
+        provider_name="Repository Smoke Provider",
+        base_url="https://example.invalid/repository-smoke",
+        auth_type="none",
+    )
+    cursor = connection.cursor()
+    cursor.execute(
+        "SELECT provider_id FROM SP.data_provider WHERE provider_code = ?",
+        (smoke_provider.provider_code,),
+    )
+    row = cursor.fetchone()
+    if row is None:
+        raise RuntimeError("repository smoke provider_id lookup returned no rows")
+    repository.insert_data_license(
+        row[0],
+        license_policy_from_provider(
+            smoke_provider,
+            license_name="repository_smoke_policy",
+        ),
+    )
+
+    log = AuditLog()
+    event = log.append(
+        actor_type="system",
+        actor_id="goldilocks_repository_smoke",
+        action_code="REPOSITORY_SMOKE",
+        target_type="goldilocks",
+        target_id="rollback",
+        detail={"mode": "rollback"},
+        occurred_at=datetime.utcnow(),
+    )
+    repository.insert_audit_event(event)
+
+    shock = ScenarioShock(
+        scenario_id="repository-smoke",
+        name="rollback smoke",
+        price_shock_pct=-0.01,
+        fx_shock_pct=0.01,
+        liquidity_multiplier=0.9,
+    )
+    repository.insert_scenario_result(
+        shock,
+        apply_scenario_shock(100.0, 1300.0, 1_000_000_000.0, shock),
+        created_at=datetime.utcnow(),
+    )
+
+    repository.insert_restore_check_run(
+        RestoreCheckResult(
+            status="ok",
+            checked_at=datetime.utcnow(),
+            manifest_path="/tmp/repository-smoke/manifest.json",
+            issue_count=0,
+            issues=[],
+        )
+    )
+
+    headline = Headline(
+        provider="ofac",
+        title="Repository smoke sanctions headline",
+        published_at=datetime.utcnow(),
+        url="https://ofac.treasury.gov/recent-actions",
+        security_ids=("AAPL",),
+        group_ids=("semiconductor",),
+        event_tags=("geopolitical", "sanction"),
+        metadata={"raw_ref": "repository-smoke"},
+    )
+    cluster = deduplicate_headlines([headline])[0]
+    signal = headline_clusters_to_event_risk_signals([cluster])[0]
+    repository.insert_headline_event(headline)
+    repository.insert_headline_dedup_cluster(cluster)
+    repository.insert_headline_risk_signal(signal)
+
+    rollback = getattr(connection, "rollback", None)
+    if rollback is not None:
+        rollback()
+    print("Goldilocks repository smoke passed: provider/license/audit/scenario/restore/headline writer rollback completed")
+except Exception:
+    rollback = getattr(connection, "rollback", None)
+    if rollback is not None:
+        rollback()
+    raise
+PY

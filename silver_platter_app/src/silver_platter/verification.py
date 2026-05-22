@@ -2,6 +2,8 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Dict, Iterable, List, Optional, Tuple
 
+from silver_platter.backtest import PaperReplayEvidence
+
 
 @dataclass(frozen=True)
 class GateRequirement:
@@ -57,6 +59,12 @@ DEFAULT_GATE_REQUIREMENTS: Tuple[GateRequirement, ...] = (
     GateRequirement("G4", "simulation_no_broker", "Simulation never sends broker order", "Paper adapter ack"),
     GateRequirement("G4", "fifo_pnl", "FIFO realized PnL is calculated", "tests/test_accounting_posting.py"),
     GateRequirement("G5", "backtest_no_lookahead", "Backtest blocks lookahead", "tests/test_backtest.py"),
+    GateRequirement("G6", "paper_replay_duration", "Paper replay covers required duration", "paper_replay_evidence"),
+    GateRequirement("G6", "paper_no_broker_send", "Paper replay never sends broker order", "paper_replay_evidence"),
+    GateRequirement("G6", "paper_no_lookahead", "Paper replay has no lookahead violations", "paper_replay_evidence"),
+    GateRequirement("G7", "live_order_disabled_default", "Live order sending is disabled by default", "config/live_order_enabled"),
+    GateRequirement("G7", "kill_switch_tested", "Kill switch blocks new orders", "tests/test_risk_controls.py"),
+    GateRequirement("G7", "reconciliation_passed", "Broker/internal reconciliation passes", "tests/test_accounting_posting.py"),
     GateRequirement("G8", "backup_manifest", "Backup manifest is restorable", "tests/test_backup.py"),
 )
 
@@ -98,3 +106,66 @@ def assess_gate(
         missing_requirements=tuple(missing),
         failed_evidence=tuple(failed),
     )
+
+
+def paper_replay_to_gate_evidence(
+    replay: PaperReplayEvidence,
+    required_min_days: int,
+    checked_at: Optional[datetime] = None,
+) -> List[GateEvidence]:
+    checked = checked_at or replay.generated_at
+    return [
+        GateEvidence(
+            "paper_replay_duration",
+            "pass" if replay.replay_day_count >= required_min_days else "fail",
+            "paper_replay_evidence:%s" % replay.run_id,
+            checked,
+            "replay_day_count=%s required_min_days=%s"
+            % (replay.replay_day_count, required_min_days),
+        ),
+        GateEvidence(
+            "paper_no_broker_send",
+            "pass" if not replay.broker_send_attempted else "fail",
+            "paper_replay_evidence:%s" % replay.run_id,
+            checked,
+            "broker_send_attempted=%s" % replay.broker_send_attempted,
+        ),
+        GateEvidence(
+            "paper_no_lookahead",
+            "pass" if replay.lookahead_violation_count == 0 else "fail",
+            "paper_replay_evidence:%s" % replay.run_id,
+            checked,
+            "lookahead_violation_count=%s" % replay.lookahead_violation_count,
+        ),
+    ]
+
+
+def live_safety_to_gate_evidence(
+    live_order_enabled_default: bool,
+    kill_switch_tested: bool,
+    reconciliation_passed: bool,
+    checked_at: datetime,
+) -> List[GateEvidence]:
+    return [
+        GateEvidence(
+            "live_order_disabled_default",
+            "pass" if not live_order_enabled_default else "fail",
+            "config:LIVE_ORDER_ENABLED",
+            checked_at,
+            "live_order_enabled_default=%s" % live_order_enabled_default,
+        ),
+        GateEvidence(
+            "kill_switch_tested",
+            "pass" if kill_switch_tested else "fail",
+            "risk_controls:kill_switch",
+            checked_at,
+            "kill_switch_tested=%s" % kill_switch_tested,
+        ),
+        GateEvidence(
+            "reconciliation_passed",
+            "pass" if reconciliation_passed else "fail",
+            "accounting:reconciliation",
+            checked_at,
+            "reconciliation_passed=%s" % reconciliation_passed,
+        ),
+    ]

@@ -1,0 +1,41 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+cd "$(dirname "$0")/.."
+
+PYTHONPATH=src python3 - <<'PY'
+from silver_platter.broker import (
+    KoreaInvestmentBrokerAdapter,
+    KoreaInvestmentCredentials,
+    KoreaInvestmentHttpTransport,
+)
+from silver_platter.config import AppSettings
+
+settings = AppSettings.from_env()
+kis = settings.kis
+if not kis.configured_for_queries():
+    print("KIS orderable smoke skipped: KIS_APP_KEY, KIS_APP_SECRET, KIS_ACCOUNT_NO, and KIS_API_BASE_URL are required")
+    raise SystemExit(0)
+
+adapter = KoreaInvestmentBrokerAdapter(
+    live_order_enabled=False,
+    credentials=KoreaInvestmentCredentials(
+        app_key=kis.app_key,
+        app_secret=kis.app_secret,
+        account_number=kis.account_number,
+        account_product_code=kis.account_product_code,
+        trading_env=kis.trading_env,
+    ),
+    transport=KoreaInvestmentHttpTransport(kis.api_base_url),
+)
+result = adapter.inquire_domestic_orderable("005930", order_price=0, order_type="market")
+print(
+    "KIS orderable smoke passed: security_id=%s order_division=%s nrcvb_buy_qty=%s max_buy_qty=%s"
+    % (
+        result.security_id,
+        result.order_division,
+        result.nrcvb_buy_quantity,
+        result.max_buy_quantity,
+    )
+)
+PY

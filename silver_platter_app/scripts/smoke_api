@@ -3,6 +3,14 @@ set -euo pipefail
 
 API_URL="${API_URL:-http://localhost:8000}"
 STAMP="$(date +%s)"
+SNAPSHOT_DIR="$(mktemp -d)"
+trap 'rm -rf "${SNAPSHOT_DIR}"' EXIT
+SNAPSHOT_FILE="${SNAPSHOT_DIR}/smoke-price-bars.jsonl"
+
+printf '%s\n' \
+  '{"security_id":"AAPL","bar_ts":"2026-05-21T09:00:00","close_price":200.0,"volume":1000,"turnover_krw":200000,"available_to_model_at":"2026-05-21T09:00:00"}' \
+  '{"security_id":"AAPL","bar_ts":"2026-05-22T09:00:00","close_price":202.0,"volume":1000,"turnover_krw":202000,"available_to_model_at":"2026-05-22T09:00:00"}' \
+  > "${SNAPSHOT_FILE}"
 
 curl -fsS "${API_URL}/health" >/dev/null
 
@@ -18,12 +26,71 @@ curl -fsS -X POST "${API_URL}/api/ml/jobs/run" \
   -H 'Content-Type: application/json' \
   -d '{"job_id":"smoke-ml","snapshot":{"security_id":"AAPL","as_of":"2026-05-22T09:00:00","last_price":200,"avg_volume_20d":50000000,"annualized_volatility":0.3,"risk_score":35},"horizons":["1d"]}' >/dev/null
 
+curl -fsS -X POST "${API_URL}/api/indices/chart" \
+  -H 'Content-Type: application/json' \
+  -d '{"security_id":"AAPL","observations":[{"security_id":"AAPL","observed_at":"2026-05-21T09:00:00","volatility_index":32.5,"risk_score":30.1},{"security_id":"AAPL","observed_at":"2026-05-22T09:00:00","volatility_index":34.0,"risk_score":31.2}]}' >/dev/null
+
+curl -fsS -X POST "${API_URL}/api/groups/volatility/compare" \
+  -H 'Content-Type: application/json' \
+  -d '{"base_date":"2026-05-21","observations":[{"group_id":"semiconductor","observation_date":"2026-05-21","volatility_value":0.24},{"group_id":"semiconductor","observation_date":"2026-05-22","volatility_value":0.27}]}' >/dev/null
+
+curl -fsS -X POST "${API_URL}/api/headlines/risk-signals" \
+  -H 'Content-Type: application/json' \
+  -d '{"headlines":[{"provider":"federal_reserve","title":"Sanction shock affects chip exports","published_at":"2026-05-22T09:00:00","url":"https://www.federalreserve.gov/feeds/press_all.xml","security_ids":["AAPL"],"group_ids":["semiconductor"],"event_tags":["geopolitical","sanction"]},{"provider":"ecb","title":"Sanction shock affects chip exports","published_at":"2026-05-22T09:05:00","url":"https://www.ecb.europa.eu/rss/press.html","group_ids":["semiconductor"],"event_tags":["geopolitical","sanction"]}]}' >/dev/null
+
+curl -fsS -X POST "${API_URL}/api/tax/overseas-capital-gains" \
+  -H 'Content-Type: application/json' \
+  -d '{"tax_year":2026,"trades":[{"security_id":"AAPL","market":"US","realized_date":"2026-05-22","realized_pnl_krw":4500000,"fee_krw":60000}]}' >/dev/null
+
+curl -fsS -X POST "${API_URL}/api/backtests/run" \
+  -H 'Content-Type: application/json' \
+  -d '{"run_id":"smoke-bt","strategy_id":"smoke","strategy_plugin_id":"momentum-threshold","strategy_parameters":{"min_return_pct":0.005},"from_date":"2026-05-21","to_date":"2026-05-22","security_id":"AAPL","market":"US","side":"buy","order_type":"limit","quantity":2,"avg_daily_turnover_20d_krw":1000000000,"bars":[{"security_id":"AAPL","bar_ts":"2026-05-21T09:00:00","close_price":200.0,"volume":1000,"turnover_krw":200000,"available_to_model_at":"2026-05-21T09:00:00"},{"security_id":"AAPL","bar_ts":"2026-05-22T09:00:00","close_price":202.0,"volume":1000,"turnover_krw":202000,"available_to_model_at":"2026-05-22T09:00:00"}]}' >/dev/null
+
+curl -fsS -X POST "${API_URL}/api/backtests/replay-exported-snapshot" \
+  -H 'Content-Type: application/json' \
+  -d "{\"run_id\":\"smoke-replay-${STAMP}\",\"strategy_id\":\"smoke\",\"strategy_plugin_id\":\"momentum-threshold\",\"strategy_parameters\":{\"min_return_pct\":0.005},\"from_date\":\"2026-05-21\",\"to_date\":\"2026-05-22\",\"security_id\":\"AAPL\",\"market\":\"US\",\"quantity\":2,\"avg_daily_turnover_20d_krw\":1000000000,\"required_min_days\":2,\"snapshot_paths\":[\"${SNAPSHOT_FILE}\"]}" >/dev/null
+
+curl -fsS "${API_URL}/api/backtests/strategy-plugins" >/dev/null
+
 curl -fsS -X POST "${API_URL}/api/scenarios/shock" \
   -H 'Content-Type: application/json' \
   -d '{"scenario_id":"smoke-s1","name":"market drop","current_price":100,"fx_rate":1300,"avg_daily_turnover_20d_krw":1000000000,"price_shock_pct":-0.1,"fx_shock_pct":0.08,"liquidity_multiplier":0.5}' >/dev/null
 
+curl -fsS -X POST "${API_URL}/api/audit/events" \
+  -H 'Content-Type: application/json' \
+  -d "{\"actor_type\":\"system\",\"actor_id\":\"smoke\",\"action_code\":\"SMOKE_API\",\"target_type\":\"api\",\"target_id\":\"smoke-${STAMP}\",\"detail\":{\"status\":\"pass\"}}" >/dev/null
+
+curl -fsS "${API_URL}/api/audit/events?action_code=SMOKE_API" >/dev/null
+
 curl -fsS -X POST "${API_URL}/api/operations/summary" \
   -H 'Content-Type: application/json' \
   -d '{"components":[{"component":"api","status":"ok","detail":"ready","checked_at":"2026-05-22T10:00:00"}]}' >/dev/null
+
+curl -fsS "${API_URL}/api/operations/backup-status?backup_base_dir=${SNAPSHOT_DIR}" >/dev/null
+
+curl -fsS "${API_URL}/api/operations/provider-health" >/dev/null
+
+curl -fsS "${API_URL}/api/providers/catalog" | python3 -c '
+import json
+import sys
+
+payload = json.load(sys.stdin)
+codes = {item["provider_code"] for item in payload["providers"]}
+missing = {"ofac", "free_fx_placeholder"} - codes
+if missing:
+    raise SystemExit("provider catalog missing: %s" % sorted(missing))
+' >/dev/null
+
+curl -fsS -X POST "${API_URL}/api/verification/gates/assess" \
+  -H 'Content-Type: application/json' \
+  -d '{"gate_id":"G2","evidence":[{"requirement_id":"api_health","status":"pass","evidence_uri":"GET /health","checked_at":"2026-05-22T10:00:00"},{"requirement_id":"web_health","status":"pass","evidence_uri":"GET /","checked_at":"2026-05-22T10:00:00"},{"requirement_id":"compose_config","status":"pass","evidence_uri":"docker compose config","checked_at":"2026-05-22T10:00:00"}]}' >/dev/null
+
+curl -fsS -X POST "${API_URL}/api/verification/gates/assess" \
+  -H 'Content-Type: application/json' \
+  -d '{"gate_id":"G6","evidence":[{"requirement_id":"paper_replay_duration","status":"pass","evidence_uri":"paper_replay_evidence:smoke-bt","checked_at":"2026-05-22T10:00:00","detail":"replay_day_count=2 required_min_days=1"},{"requirement_id":"paper_no_broker_send","status":"pass","evidence_uri":"paper_replay_evidence:smoke-bt","checked_at":"2026-05-22T10:00:00","detail":"broker_send_attempted=false"},{"requirement_id":"paper_no_lookahead","status":"pass","evidence_uri":"paper_replay_evidence:smoke-bt","checked_at":"2026-05-22T10:00:00","detail":"lookahead_violation_count=0"}]}' >/dev/null
+
+curl -fsS -X POST "${API_URL}/api/verification/gates/assess" \
+  -H 'Content-Type: application/json' \
+  -d '{"gate_id":"G7","evidence":[{"requirement_id":"live_order_disabled_default","status":"pass","evidence_uri":"config:LIVE_ORDER_ENABLED","checked_at":"2026-05-22T10:00:00","detail":"live_order_enabled_default=false"},{"requirement_id":"kill_switch_tested","status":"pass","evidence_uri":"risk_controls:kill_switch","checked_at":"2026-05-22T10:00:00","detail":"kill_switch_tested=true"},{"requirement_id":"reconciliation_passed","status":"pass","evidence_uri":"accounting:reconciliation","checked_at":"2026-05-22T10:00:00","detail":"reconciliation_passed=true"}]}' >/dev/null
 
 echo "API smoke checks passed for ${API_URL}"

@@ -1,0 +1,39 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+cd "$(dirname "$0")/.."
+
+if [ "${KRX_PRICE_SMOKE_ENABLED:-0}" != "1" ]; then
+  echo "KRX price smoke skipped: set KRX_PRICE_SMOKE_ENABLED=1 to run read-only network check"
+  exit 0
+fi
+
+SYMBOL="${KRX_PRICE_SMOKE_SYMBOL:-005930}"
+TRADE_DATE="${KRX_PRICE_SMOKE_DATE:-}"
+
+PYTHONPATH=src python3 - <<PY
+from datetime import date
+
+from silver_platter.providers import KrxDailyPriceProvider
+
+symbol = "${SYMBOL}"
+trade_date = date.fromisoformat("${TRADE_DATE}" or date.today().isoformat())
+provider = KrxDailyPriceProvider(trade_date=trade_date)
+bars = list(provider.get_price_bars(symbol))
+if not bars:
+    raise SystemExit(
+        "KRX price smoke failed: no bars returned for %s on %s"
+        % (symbol, trade_date.isoformat())
+    )
+bar = bars[-1]
+print(
+    "KRX price smoke passed: provider=%s symbol=%s date=%s close=%.4f volume=%.0f"
+    % (
+        provider.metadata.provider_code,
+        bar.security_id,
+        bar.bar_ts.date().isoformat(),
+        bar.close_price or 0.0,
+        bar.volume or 0.0,
+    )
+)
+PY

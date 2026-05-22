@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+cd "$(dirname "$0")/.."
+
+if [ "${OFFICIAL_RSS_SMOKE_ENABLED:-0}" != "1" ]; then
+  echo "Official RSS smoke skipped: set OFFICIAL_RSS_SMOKE_ENABLED=1 to run read-only network check"
+  exit 0
+fi
+
+PYTHONPATH=src python3 - <<'PY'
+from silver_platter.headlines import (
+    OfficialRssHeadlineProvider,
+    default_official_rss_sources,
+)
+
+total = 0
+for source in default_official_rss_sources():
+    provider = OfficialRssHeadlineProvider(source)
+    headlines = provider.fetch_headlines(limit=5)
+    total += len(headlines)
+    print(
+        "Official RSS source passed: provider=%s headlines=%s"
+        % (source.provider, len(headlines))
+    )
+if total == 0:
+    raise SystemExit("Official RSS smoke failed: no headlines returned")
+PY

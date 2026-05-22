@@ -36,15 +36,40 @@
 - component status 모델
 - 전체 상태 `ok/degraded/critical` 계산
 - open issue count 계산
+- provider catalog/credential/smoke 실패 상태를 component status로 변환
 - 운영 대시보드용 summary dict 변환
 
-### 3.3 API
+### 3.3 Alert delivery
+
+추가 파일:
+
+- `src/silver_platter/alerts.py`
+
+기능:
+
+- operations summary의 non-ok component를 alert message로 변환
+- geopolitical/realtime risk alert를 delivery message로 변환
+- memory delivery provider
+- webhook delivery provider와 injectable transport
+- alert dispatch 결과를 audit event로 기록
+- `scripts/alert_webhook_smoke` smoke
+
+### 3.4 Repository writer
+
+기능:
+
+- `audit_log` insert SQL generation
+- `alert_delivery_run` insert SQL generation
+
+### 3.5 API
 
 추가 endpoint:
 
 - `POST /api/audit/events`
 - `GET /api/audit/events`
 - `POST /api/operations/summary`
+- `GET /api/operations/provider-health`
+- `GET /api/providers/catalog`
 
 ## 4. 테스트
 
@@ -52,21 +77,34 @@
 
 - `tests/test_audit.py`
 - `tests/test_operations.py`
+- `tests/test_alerts.py`
 
 검증 범위:
 
 - audit append/query
 - target 기반 filter
 - operations status escalation
+- provider health component mapping
+- provider health license-policy detail and block state
+- provider health API response
+- provider catalog structured license-policy API response
 - issue count 계산
+- operations alert message 생성
+- realtime risk alert message 생성
+- delivery dispatch와 audit event 기록
+- webhook transport payload 검증
+- audit repository SQL generation
+- alert delivery result repository SQL generation
+- rollback-only repository smoke의 provider/license writer 경로
 
 ## 5. 남은 실제 연동
 
-- audit log Goldilocks writer
+- audit log 실제 Goldilocks writer smoke
+  - `scripts/goldilocks_repository_smoke` 준비 완료, 기본은 rollback-only smoke opt-in 전 skip
 - user/session actor source 연결
 - setting 변경 diff 저장
 - 운영 화면에서 summary polling
-- alert delivery provider 연결
+- 실제 webhook delivery smoke는 script 준비 완료, 현재 환경은 `ALERT_WEBHOOK_URL` 없음
 
 ## 6. 검증 명령
 

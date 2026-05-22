@@ -2,4 +2,7 @@
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
-PYTHONPATH=src python3 -m silver_platter.migrations "${1:-status}"
+if [ "$#" -eq 0 ]; then
+  set -- status
+fi
+PYTHONPATH=src python3 -m silver_platter.migrations "$@"

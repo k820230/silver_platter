@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+cd "$(dirname "$0")/.."
+
+PYTHONPATH=src python3 - <<'PY'
+from silver_platter.config import AppSettings
+from silver_platter.providers import SecEdgarDisclosureProvider
+
+settings = AppSettings.from_env()
+user_agent = settings.sec_edgar_user_agent.strip()
+if not user_agent or "example.com" in user_agent.lower():
+    print("SEC EDGAR smoke skipped: set SEC_EDGAR_USER_AGENT to a real contact User-Agent")
+    raise SystemExit(0)
+
+provider = SecEdgarDisclosureProvider(
+    user_agent=user_agent,
+    cik_lookup={"AAPL": "320193"},
+    forms=("10-K", "10-Q", "8-K"),
+)
+disclosures = list(provider.get_disclosures("AAPL"))
+if not disclosures:
+    raise SystemExit("SEC EDGAR smoke failed: no recent AAPL disclosures returned")
+print(
+    "SEC EDGAR smoke passed: provider=%s disclosures=%s latest=%s"
+    % (
+        provider.metadata.provider_code,
+        len(disclosures),
+        disclosures[0].provider_event_id,
+    )
+)
+PY

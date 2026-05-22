@@ -1,12 +1,14 @@
 from datetime import datetime, timedelta
 from unittest import TestCase
 
+from silver_platter.headlines import Headline, deduplicate_headlines
 from silver_platter.risk_controls import (
     EventRiskSignal,
     KillSwitchInput,
     KillSwitchState,
     evaluate_event_risk,
     evaluate_kill_switch,
+    headline_clusters_to_event_risk_signals,
 )
 
 
@@ -59,3 +61,28 @@ class RiskControlsTests(TestCase):
         )
 
         self.assertEqual([], issues)
+
+    def test_headline_clusters_convert_to_event_risk_signals(self):
+        published_at = datetime(2026, 5, 22, 9, 0, 0)
+        clusters = deduplicate_headlines(
+            [
+                Headline(
+                    provider="federal_reserve",
+                    title="Sanction shock affects chip exports",
+                    published_at=published_at,
+                    url="https://www.federalreserve.gov/a",
+                    security_ids=("005930",),
+                    group_ids=("semiconductor",),
+                    event_tags=("geopolitical", "sanction"),
+                )
+            ]
+        )
+
+        signals = headline_clusters_to_event_risk_signals(clusters)
+
+        self.assertEqual(1, len(signals))
+        self.assertEqual("headline", signals[0].event_type)
+        self.assertEqual("critical", signals[0].severity)
+        self.assertEqual({"005930"}, signals[0].security_ids)
+        self.assertEqual({"semiconductor"}, signals[0].group_ids)
+        self.assertEqual(published_at + timedelta(minutes=30), signals[0].expires_at)

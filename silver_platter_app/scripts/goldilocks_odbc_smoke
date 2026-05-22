@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+cd "$(dirname "$0")/.."
+
+PYTHONPATH=src python3 - <<'PY'
+from silver_platter.migrations import (
+    build_migration_plan,
+    connect_goldilocks_from_env,
+    list_migrations,
+    load_applied_migrations,
+)
+
+try:
+    connection = connect_goldilocks_from_env()
+except RuntimeError as exc:
+    message = str(exc)
+    if (
+        "GOLDILOCKS_ODBC_CONNECT_STRING" in message
+        or "pyodbc is required" in message
+    ):
+        print("Goldilocks ODBC smoke skipped: %s" % message)
+        raise SystemExit(0)
+    raise
+
+applied = load_applied_migrations(connection)
+plan = build_migration_plan(list_migrations())
+print(
+    "Goldilocks ODBC smoke passed: migration_count=%s applied_count=%s"
+    % (len(plan), len(applied))
+)
+PY

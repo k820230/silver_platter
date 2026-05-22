@@ -1,0 +1,36 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+cd "$(dirname "$0")/.."
+
+PYTHONPATH=src python3 - <<'PY'
+from datetime import datetime
+
+from silver_platter.alerts import (
+    WebhookAlertDeliveryProvider,
+    build_operations_alert_messages,
+)
+from silver_platter.config import AppSettings
+from silver_platter.operations import ComponentStatus, summarize_operations
+
+settings = AppSettings.from_env()
+if not settings.alert_webhook_url.strip():
+    print("Alert webhook smoke skipped: ALERT_WEBHOOK_URL is not configured")
+    raise SystemExit(0)
+
+summary = summarize_operations(
+    [
+        ComponentStatus(
+            "smoke_alert",
+            "degraded",
+            "alert webhook smoke",
+            datetime.utcnow(),
+        )
+    ],
+)
+message = build_operations_alert_messages(summary)[0]
+result = WebhookAlertDeliveryProvider(settings.alert_webhook_url).send(message)
+if result.status != "delivered":
+    raise SystemExit("Alert webhook smoke failed: %s" % result.error_message)
+print("Alert webhook smoke passed: alert_id=%s" % result.alert_id)
+PY

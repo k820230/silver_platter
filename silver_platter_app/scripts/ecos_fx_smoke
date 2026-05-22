@@ -1,0 +1,46 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+cd "$(dirname "$0")/.."
+
+PYTHONPATH=src python3 - <<'PY'
+import os
+from datetime import date, timedelta
+
+from silver_platter.config import AppSettings
+from silver_platter.providers import EcosFxRateProvider
+
+settings = AppSettings.from_env()
+if not settings.ecos_api_key.strip():
+    print("ECOS FX smoke skipped: ECOS_API_KEY is not configured")
+    raise SystemExit(0)
+
+end_date = date.fromisoformat(os.getenv("ECOS_FX_END_DATE", date.today().isoformat()))
+start_date = date.fromisoformat(
+    os.getenv("ECOS_FX_START_DATE", (end_date - timedelta(days=14)).isoformat())
+)
+base_currency = os.getenv("ECOS_FX_BASE_CURRENCY", "USD")
+quote_currency = os.getenv("ECOS_FX_QUOTE_CURRENCY", "KRW")
+
+provider = EcosFxRateProvider(
+    settings.ecos_api_key,
+    start_date=start_date,
+    end_date=end_date,
+)
+rates = list(provider.get_rates(base_currency, quote_currency))
+if not rates:
+    raise SystemExit("ECOS FX smoke failed: no rates returned")
+
+latest = rates[-1]
+print(
+    "ECOS FX smoke passed: provider=%s pair=%s/%s rates=%s latest=%s %.4f"
+    % (
+        provider.metadata.provider_code,
+        latest.base_currency,
+        latest.quote_currency,
+        len(rates),
+        latest.rate_date.isoformat(),
+        latest.rate,
+    )
+)
+PY

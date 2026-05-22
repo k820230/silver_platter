@@ -100,8 +100,8 @@
 | 평균 거래대금 계산 | [ ] |
 | 환율 데이터 수집 | [ ] |
 | OpenDART/KRX/KIND/SEC EDGAR 후보 연결 검토 | [ ] |
-| headline은 headline+metadata만 저장 | [ ] |
-| provider license/entitlement 기록 | [ ] |
+| headline은 headline+metadata만 저장 | [x] |
+| provider license/entitlement 기록 | [x] |
 | data quality score 산출 | [ ] |
 | `available_to_model_at` 저장 | [ ] |
 

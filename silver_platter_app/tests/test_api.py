@@ -1,0 +1,180 @@
+from datetime import date, datetime
+from pathlib import Path
+from tempfile import TemporaryDirectory
+from unittest import TestCase
+from unittest.mock import patch
+
+from fastapi import HTTPException
+
+from silver_platter.api.main import (
+    BacktestRunRequest,
+    ExportedSnapshotReplayRequest,
+    PriceBarQualityItem,
+    backtest_replay_exported_snapshot,
+    backtest_run,
+    backtest_strategy_plugins,
+    headline_risk_signals,
+    HeadlineRiskSignalsRequest,
+    operations_provider_health,
+    provider_catalog,
+)
+from silver_platter.exports import export_price_bars_partitioned
+from silver_platter.providers import sample_bar
+
+
+class ApiBoundaryTests(TestCase):
+    def test_strategy_plugins_endpoint_lists_builtin_plugins(self):
+        response = backtest_strategy_plugins()
+
+        self.assertEqual(
+            ["fixed-close", "momentum-threshold"],
+            [item["plugin_id"] for item in response["plugins"]],
+        )
+
+    def test_backtest_run_unknown_strategy_plugin_returns_400(self):
+        with self.assertRaises(HTTPException) as raised:
+            backtest_run(
+                BacktestRunRequest(
+                    run_id="api-bt",
+                    strategy_id="api",
+                    strategy_plugin_id="missing-plugin",
+                    from_date=date(2026, 5, 22),
+                    to_date=date(2026, 5, 22),
+                    security_id="AAPL",
+                    market="US",
+                    quantity=1,
+                    avg_daily_turnover_20d_krw=1_000_000_000,
+                    bars=[
+                        PriceBarQualityItem(
+                            security_id="AAPL",
+                            bar_ts=datetime(2026, 5, 22, 9, 0, 0),
+                            close_price=200.0,
+                            volume=1000,
+                            turnover_krw=200000,
+                            available_to_model_at=datetime(2026, 5, 22, 9, 0, 0),
+                        )
+                    ],
+                )
+            )
+
+        self.assertEqual(400, raised.exception.status_code)
+        self.assertIn("unknown strategy plugin", raised.exception.detail)
+
+    def test_replay_exported_snapshot_missing_path_returns_400(self):
+        with self.assertRaises(HTTPException) as raised:
+            backtest_replay_exported_snapshot(
+                ExportedSnapshotReplayRequest(
+                    run_id="api-replay",
+                    strategy_id="api",
+                    from_date=date(2026, 5, 22),
+                    to_date=date(2026, 5, 22),
+                    security_id="AAPL",
+                    snapshot_paths=["/tmp/silver-platter-missing-snapshot.jsonl"],
+                )
+            )
+
+        self.assertEqual(400, raised.exception.status_code)
+        self.assertIn("silver-platter-missing-snapshot", raised.exception.detail)
+
+    def test_replay_exported_snapshot_accepts_strategy_parameters(self):
+        with TemporaryDirectory() as tmp:
+            export_price_bars_partitioned(
+                [
+                    sample_bar("AAPL", datetime(2026, 5, 22, 9, 0, 0), 100.0),
+                    sample_bar("AAPL", datetime(2026, 5, 23, 9, 0, 0), 102.0),
+                ],
+                Path(tmp),
+                provider_code="free",
+                prefer_parquet=False,
+            )
+
+            payload = backtest_replay_exported_snapshot(
+                ExportedSnapshotReplayRequest(
+                    run_id="api-replay",
+                    strategy_id="api",
+                    strategy_plugin_id="momentum-threshold",
+                    strategy_parameters={"min_return_pct": 0.01},
+                    from_date=date(2026, 5, 22),
+                    to_date=date(2026, 5, 23),
+                    security_id="AAPL",
+                    market="US",
+                    snapshot_paths=[tmp],
+                )
+            )
+
+        self.assertEqual("momentum-threshold", payload["strategy_plugin_id"])
+        self.assertEqual(1, len(payload["order_events"]))
+
+    def test_provider_health_endpoint_reports_unconfigured_providers(self):
+        with patch.dict(
+            "os.environ",
+            {
+                "OPENDART_API_KEY": "",
+                "ECOS_API_KEY": "",
+                "SEC_EDGAR_USER_AGENT": "Silver Platter admin@example.com",
+                "KRX_KIND_SMOKE_ENABLED": "0",
+                "KRX_PRICE_SMOKE_ENABLED": "0",
+            },
+        ):
+            payload = operations_provider_health()
+
+        statuses = {
+            component["component"]: component["status"]
+            for component in payload["components"]
+        }
+        details = {
+            component["component"]: component["detail"]
+            for component in payload["components"]
+        }
+        self.assertEqual("degraded", payload["status"])
+        self.assertEqual("degraded", statuses["provider:opendart:disclosure"])
+        self.assertEqual("degraded", statuses["provider:ecos_bok:fx"])
+        self.assertEqual("ready", statuses["provider:krx_free:reference_data"])
+        self.assertIn("license=opendart_mvp_policy", details["provider:opendart:disclosure"])
+        self.assertIn("redistribute=False", details["provider:opendart:disclosure"])
+
+    def test_provider_catalog_endpoint_lists_structured_license_policies(self):
+        payload = provider_catalog()
+
+        providers = {
+            (item["provider_code"], item["provider_type"]): item
+            for item in payload["providers"]
+        }
+        self.assertIn(("krx_free", "reference_data"), providers)
+        self.assertIn(("ofac", "headline"), providers)
+        ofac_policy = providers[("ofac", "headline")]["license_policy"]
+        self.assertEqual("ofac_mvp_policy", ofac_policy["license_name"])
+        self.assertTrue(ofac_policy["can_store"])
+        self.assertTrue(ofac_policy["can_transform"])
+        self.assertFalse(ofac_policy["can_display_realtime"])
+        self.assertFalse(ofac_policy["can_redistribute"])
+
+    def test_headline_risk_signals_endpoint_deduplicates_and_maps_signal(self):
+        payload = headline_risk_signals(
+            HeadlineRiskSignalsRequest(
+                headlines=[
+                    {
+                        "provider": "federal_reserve",
+                        "title": "Sanction shock affects chip exports",
+                        "published_at": datetime(2026, 5, 22, 9, 0, 0),
+                        "url": "https://www.federalreserve.gov/a",
+                        "security_ids": ["005930"],
+                        "group_ids": ["semiconductor"],
+                        "event_tags": ["geopolitical", "sanction"],
+                    },
+                    {
+                        "provider": "ecb",
+                        "title": "Sanction shock affects chip exports",
+                        "published_at": datetime(2026, 5, 22, 9, 5, 0),
+                        "url": "https://www.ecb.europa.eu/b",
+                        "group_ids": ["semiconductor"],
+                        "event_tags": ["geopolitical", "sanction"],
+                    },
+                ]
+            )
+        )
+
+        self.assertEqual(1, len(payload["clusters"]))
+        self.assertEqual(1, len(payload["signals"]))
+        self.assertEqual("critical", payload["signals"][0]["severity"])
+        self.assertEqual(["005930"], payload["signals"][0]["security_ids"])

@@ -49,6 +49,34 @@ class BacktestResult:
 
 
 @dataclass(frozen=True)
+class PaperReplayEvidence:
+    run_id: str
+    status: str
+    replay_day_count: int
+    order_count: int
+    accepted_order_count: int
+    blocked_order_count: int
+    lookahead_violation_count: int
+    broker_send_attempted: bool
+    generated_at: datetime
+    evidence: Dict[str, str] = field(default_factory=dict)
+
+    def as_dict(self) -> dict:
+        return {
+            "run_id": self.run_id,
+            "status": self.status,
+            "replay_day_count": self.replay_day_count,
+            "order_count": self.order_count,
+            "accepted_order_count": self.accepted_order_count,
+            "blocked_order_count": self.blocked_order_count,
+            "lookahead_violation_count": self.lookahead_violation_count,
+            "broker_send_attempted": self.broker_send_attempted,
+            "generated_at": self.generated_at.isoformat(),
+            "evidence": self.evidence,
+        }
+
+
+@dataclass(frozen=True)
 class ScenarioShock:
     scenario_id: str
     name: str
@@ -120,7 +148,9 @@ def run_backtest(
         )
 
     blocked = len([event for event in events if not event.accepted])
+    accepted = len(events) - blocked
     invested_basis = config.initial_cash_krw if config.initial_cash_krw else 1.0
+    replay_day_count = (config.to_date - config.from_date).days + 1
     return BacktestResult(
         run_id=config.run_id,
         status="completed",
@@ -132,8 +162,52 @@ def run_backtest(
         metrics={
             "realized_return_pct": round(account.realized_pnl_krw / invested_basis, 8),
             "order_count": float(len(events)),
+            "accepted_order_count": float(accepted),
             "blocked_order_count": float(blocked),
+            "replay_day_count": float(replay_day_count),
         },
+    )
+
+
+def build_paper_replay_evidence(
+    result: BacktestResult,
+    required_min_days: int = 1,
+    broker_send_attempted: bool = False,
+    generated_at: Optional[datetime] = None,
+) -> PaperReplayEvidence:
+    replay_day_count = int(result.metrics.get("replay_day_count", 0))
+    order_count = int(result.metrics.get("order_count", len(result.order_events)))
+    accepted_order_count = int(
+        result.metrics.get(
+            "accepted_order_count",
+            len([event for event in result.order_events if event.accepted]),
+        )
+    )
+    status = "pass"
+    evidence = {
+        "required_min_days": str(required_min_days),
+        "simulation_broker_send_policy": "broker_send_forbidden",
+    }
+    if replay_day_count < required_min_days:
+        status = "fail"
+        evidence["failure_reason"] = "replay_duration_below_required_min_days"
+    if result.lookahead_violation_count > 0:
+        status = "fail"
+        evidence["failure_reason"] = "lookahead_violation_detected"
+    if broker_send_attempted:
+        status = "fail"
+        evidence["failure_reason"] = "broker_send_attempted"
+    return PaperReplayEvidence(
+        run_id=result.run_id,
+        status=status,
+        replay_day_count=replay_day_count,
+        order_count=order_count,
+        accepted_order_count=accepted_order_count,
+        blocked_order_count=result.blocked_order_count,
+        lookahead_violation_count=result.lookahead_violation_count,
+        broker_send_attempted=broker_send_attempted,
+        generated_at=generated_at or datetime.utcnow(),
+        evidence=evidence,
     )
 
 

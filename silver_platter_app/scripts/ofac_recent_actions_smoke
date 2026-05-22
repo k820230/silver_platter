@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+cd "$(dirname "$0")/.."
+
+if [ "${OFAC_RECENT_ACTIONS_SMOKE_ENABLED:-0}" != "1" ]; then
+  echo "OFAC recent actions smoke skipped: set OFAC_RECENT_ACTIONS_SMOKE_ENABLED=1 to run read-only network check"
+  exit 0
+fi
+
+PYTHONPATH=src python3 - <<'PY'
+from silver_platter.headlines import OfacRecentActionsHeadlineProvider
+
+provider = OfacRecentActionsHeadlineProvider()
+headlines = provider.fetch_headlines(limit=5)
+if not headlines:
+    raise SystemExit("OFAC recent actions smoke failed: no headlines returned")
+print(
+    "OFAC recent actions smoke passed: provider=%s headlines=%s latest=%s"
+    % (headlines[0].provider, len(headlines), headlines[0].published_at.date().isoformat())
+)
+PY

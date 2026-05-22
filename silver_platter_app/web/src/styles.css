@@ -51,6 +51,31 @@ body {
   width: 36px;
 }
 
+button {
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: wait;
+  opacity: 0.62;
+}
+
+.status-strip {
+  align-items: center;
+  border: 1px solid #d7c7be;
+  border-radius: 8px;
+  display: flex;
+  gap: 8px;
+  margin-top: 16px;
+  min-height: 40px;
+  padding: 0 12px;
+}
+
+.status-strip.critical {
+  background: #fff5f0;
+  color: #8c3b25;
+}
+
 .metric-grid {
   display: grid;
   gap: 12px;
@@ -88,6 +113,26 @@ body {
 
 .metric-card strong {
   font-size: 18px;
+}
+
+.metric-card.ok svg,
+.ok {
+  color: #39705f;
+}
+
+.metric-card.watch svg,
+.watch {
+  color: #9a741f;
+}
+
+.metric-card.critical svg,
+.critical {
+  color: #9d4b33;
+}
+
+.metric-card.neutral svg,
+.neutral {
+  color: #24516d;
 }
 
 .workbench {
@@ -151,6 +196,56 @@ select {
   min-height: 38px;
   padding: 0 10px;
   width: 100%;
+}
+
+.ticket-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.text-button {
+  align-items: center;
+  background: #eef4f8;
+  border: 1px solid #d8e2e8;
+  border-radius: 6px;
+  color: #1f3b4d;
+  display: inline-flex;
+  font: inherit;
+  gap: 8px;
+  min-height: 38px;
+  padding: 0 12px;
+}
+
+.text-button.primary {
+  background: #255b72;
+  border-color: #255b72;
+  color: #ffffff;
+}
+
+.decision-band,
+.index-strip {
+  background: #f6f8f9;
+  border: 1px solid #dce3e8;
+  border-radius: 8px;
+  display: grid;
+  gap: 8px 12px;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  margin-top: 16px;
+  padding: 12px;
+}
+
+.decision-band span,
+.index-strip span {
+  color: #59656e;
+  font-size: 12px;
+}
+
+.decision-band strong,
+.index-strip strong {
+  font-size: 13px;
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .range-table {
@@ -254,8 +349,12 @@ select {
   border-bottom: 1px solid #edf1f4;
   display: grid;
   gap: 10px;
-  grid-template-columns: 1fr 76px 96px;
+  grid-template-columns: minmax(0, 1fr) 76px minmax(112px, 0.8fr);
   min-height: 32px;
+}
+
+.ops-row.provider-row {
+  grid-template-columns: minmax(0, 1fr) 86px minmax(160px, 1.2fr);
 }
 
 .ops-row:last-child,
@@ -267,6 +366,7 @@ select {
 .audit-row span {
   color: #59656e;
   font-size: 12px;
+  overflow-wrap: anywhere;
 }
 
 .ops-row strong,
@@ -279,7 +379,16 @@ select {
   color: #59656e;
   font-size: 12px;
   font-style: normal;
+  overflow-wrap: anywhere;
   text-align: right;
+}
+
+.empty-row {
+  align-items: center;
+  color: #59656e;
+  display: flex;
+  font-size: 12px;
+  min-height: 32px;
 }
 
 @media (max-width: 760px) {
@@ -295,7 +404,26 @@ select {
     grid-template-columns: 1fr;
   }
 
+  .ticket-actions {
+    flex-wrap: wrap;
+  }
+
+  .decision-band,
+  .index-strip {
+    grid-template-columns: 1fr;
+  }
+
   .range-row {
     grid-template-columns: 0.8fr repeat(3, minmax(64px, 1fr));
+  }
+
+  .ops-row,
+  .audit-row {
+    grid-template-columns: 1fr;
+  }
+
+  .ops-row em,
+  .audit-row em {
+    text-align: left;
   }
 }

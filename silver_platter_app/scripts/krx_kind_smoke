@@ -1,0 +1,30 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+cd "$(dirname "$0")/.."
+
+if [ "${KRX_KIND_SMOKE_ENABLED:-0}" != "1" ]; then
+  echo "KRX KIND smoke skipped: set KRX_KIND_SMOKE_ENABLED=1 to run read-only network check"
+  exit 0
+fi
+
+SYMBOL="${KRX_KIND_SMOKE_SYMBOL:-005930}"
+
+PYTHONPATH=src python3 - <<PY
+from datetime import date, timedelta
+
+from silver_platter.providers import KrxKindDisclosureProvider
+
+symbol = "${SYMBOL}"
+today = date.today()
+provider = KrxKindDisclosureProvider(
+    begin_date=today - timedelta(days=30),
+    end_date=today,
+    page_size=10,
+)
+disclosures = list(provider.get_disclosures(symbol))
+print(
+    "KRX KIND smoke passed: symbol=%s disclosure_count=%s"
+    % (symbol, len(disclosures))
+)
+PY

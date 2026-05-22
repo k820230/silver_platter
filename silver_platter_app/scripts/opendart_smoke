@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+cd "$(dirname "$0")/.."
+
+PYTHONPATH=src python3 - <<'PY'
+from datetime import date
+
+from silver_platter.config import AppSettings
+from silver_platter.providers import OpenDartDisclosureProvider
+
+settings = AppSettings.from_env()
+if not settings.opendart_api_key.strip():
+    print("OpenDART smoke skipped: OPENDART_API_KEY is not configured")
+    raise SystemExit(0)
+
+provider = OpenDartDisclosureProvider(
+    settings.opendart_api_key,
+    corp_code_lookup={"005930": "00126380"},
+    begin_date=date(2026, 1, 1),
+    end_date=date(2026, 12, 31),
+)
+disclosures = list(provider.get_disclosures("005930"))
+print(
+    "OpenDART smoke passed: provider=%s disclosures=%s"
+    % (provider.metadata.provider_code, len(disclosures))
+)
+PY

@@ -17,6 +17,9 @@
 추가 파일:
 
 - `src/silver_platter/backtest.py`
+- `src/silver_platter/strategies.py`
+- `src/silver_platter/replay.py`
+- `scripts/replay_exported_snapshot`
 
 기능:
 
@@ -26,6 +29,20 @@
 - simulation engine 재사용
 - 주문별 accepted/reason/realized PnL event 기록
 - basic metrics
+- paper replay evidence 생성
+  - replay day count
+  - accepted/blocked order count
+  - lookahead violation count
+  - broker send attempted 여부
+  - required minimum day 기준 pass/fail
+- exported snapshot 기반 replay 입력 로딩
+- jsonl/parquet snapshot path 또는 directory 기반 replay runner
+- strategy plugin registry
+- built-in fixed-close strategy plugin
+- built-in momentum-threshold strategy plugin
+- Web UI strategy plugin selection과 momentum parameter 입력
+- backtest run/order event/metric repository writer
+- scenario result repository writer
 
 ### 3.2 Scenario shock
 
@@ -47,10 +64,13 @@
 - backup file SHA-256 계산
 - manifest 생성
 - manifest 파일 쓰기
+- backup execution lock과 중복 실행 방지
 - restore check
+- restore check repository writer
+- backup/restore status summary
 - 파일 누락, 크기 불일치, checksum mismatch 검출
 
-### 3.4 Weekly backup scheduler helper
+### 3.4 Backup/restore scheduler helper
 
 수정 파일:
 
@@ -59,7 +79,10 @@
 기능:
 
 - MVP 백업 스케줄: 토요일 10:00
+- MVP restore drill 스케줄: 매월 1일 11:00
 - 현재 시각 이후 다음 백업 예정 시각 계산
+- 현재 시각 이후 다음 restore drill 예정 시각 계산
+- 월말 길이가 짧은 달의 restore drill 일자 보정
 - scheduler startup log에 다음 백업 예정 시각 표시
 
 ## 4. 테스트
@@ -67,6 +90,9 @@
 추가 테스트:
 
 - `tests/test_backtest.py`
+- `tests/test_api.py`
+- `tests/test_exports.py`
+- `tests/test_replay.py`
 - `tests/test_backup.py`
 - `tests/test_scheduler.py`
 
@@ -75,27 +101,46 @@
 - lookahead violation count
 - backtest가 simulation risk gate를 재사용하는지
 - scenario shock 계산
+- paper replay evidence pass/fail
+- paper replay broker-send attempt 실패 처리
+- exported snapshot file 기반 backtest 실행
+- exported snapshot path/directory 기반 replay runner
+- replay runner CLI JSON output
+- strategy plugin registry와 built-in plugin 목록
+- momentum-threshold strategy plugin 주문 발생 조건
+- unknown strategy plugin 400 response
+- exported snapshot replay missing path 400 response
+- backtest repository SQL generation
+- scenario result repository SQL generation
+- restore check repository SQL generation
 - backup manifest 생성
+- backup execution lock 중복 acquire 방지
+- backup wrapper lock smoke
+- backup/restore status missing/ok/critical 판정
 - restore check 성공
 - checksum mismatch 실패 검출
 - 토요일 10:00 다음 실행 시각 계산
+- 매월 restore drill 다음 실행 시각 계산
+- 31일 schedule의 짧은 달 마지막 일자 보정
 
 ## 5. 남은 실제 연동
 
-- Goldilocks backtest result writer
-- strategy plugin interface
-- parquet snapshot 기반 대량 replay
-- 월간 restore drill scheduler
-- 백업 실행 lock과 중복 실행 방지
-- 운영 대시보드의 backup/restore 상태 조회
+- Goldilocks 실제 ODBC 대상 backtest writer smoke
+  - `scripts/goldilocks_repository_smoke` 준비 완료, 기본은 rollback-only smoke opt-in 전 skip
+- 장기 대량 replay는 실제 snapshot 확보 후 실행/튜닝 필요
 
 ## 6. API 및 Schema
 
 추가 endpoint:
 
 - `POST /api/backtests/run`
+- `POST /api/backtests/replay-exported-snapshot`
+- `GET /api/backtests/strategy-plugins`
 - `POST /api/scenarios/shock`
 - `POST /api/operations/restore-check`
+- `GET /api/operations/backup-status`
+
+`POST /api/backtests/run` 응답에는 `paper_replay_evidence`가 포함된다.
 
 추가 migration:
 

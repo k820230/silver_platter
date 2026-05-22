@@ -2,8 +2,8 @@ from datetime import date, datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
-from fastapi import FastAPI
-from pydantic import BaseModel
+from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel, Field
 
 from silver_platter.business_groups import (
     VolatilityObservation,
@@ -19,6 +19,8 @@ from silver_platter.disclosures import (
 )
 from silver_platter.headlines import (
     EventMarketSnapshot,
+    Headline,
+    deduplicate_headlines,
     detect_geopolitical_market_alert,
 )
 from silver_platter.health import get_health
@@ -29,16 +31,31 @@ from silver_platter.ml_ops import (
     run_prediction_job,
 )
 from silver_platter.broker import KoreaInvestmentBrokerAdapter, PaperBrokerAdapter
+from silver_platter.risk_controls import headline_clusters_to_event_risk_signals
 from silver_platter.backtest import (
     BacktestRunConfig,
     ScenarioShock,
     StrategyOrderCandidate,
     apply_scenario_shock,
+    build_paper_replay_evidence,
     run_backtest,
 )
-from silver_platter.backup import restore_check
+from silver_platter.backup import restore_check, summarize_backup_restore_status
+from silver_platter.replay import (
+    ExportedSnapshotReplayConfig,
+    run_exported_snapshot_replay,
+)
+from silver_platter.strategies import DEFAULT_STRATEGY_REGISTRY, StrategyContext
 from silver_platter.audit import AuditLog
-from silver_platter.operations import ComponentStatus, summarize_operations
+from silver_platter.operations import (
+    ComponentStatus,
+    provider_health_components,
+    summarize_operations,
+)
+from silver_platter.providers import (
+    default_mvp_provider_catalog,
+    license_policy_from_provider,
+)
 from silver_platter.verification import (
     DEFAULT_GATE_REQUIREMENTS,
     GateEvidence,
@@ -71,7 +88,7 @@ class OrderPreviewRequest(BaseModel):
     volatility_annualized: float = 0.30
     is_auto_order: bool = False
     fx_rate_krw: float = 1.0
-    horizons: List[str] = ["1d", "1w", "1m", "3m"]
+    horizons: List[str] = Field(default_factory=lambda: ["1d", "1w", "1m", "3m"])
     group_day_new_order_amount_krw: Optional[float] = None
     group_avg_daily_turnover_20d_krw: Optional[float] = None
 
@@ -99,7 +116,7 @@ class WatchlistAddRequest(BaseModel):
 class MlPredictionJobRequest(BaseModel):
     job_id: str
     snapshot: FeatureSnapshotRequest
-    horizons: List[str] = ["1d", "1w", "1m", "3m"]
+    horizons: List[str] = Field(default_factory=lambda: ["1d", "1w", "1m", "3m"])
 
 
 class VolatilityObservationRequest(BaseModel):
@@ -134,6 +151,21 @@ class EventMarketAlertRequest(BaseModel):
     five_min_avg_volume: float
     previous_5d_five_min_avg_volume: float
     title: str = ""
+
+
+class HeadlineRiskSignalItem(BaseModel):
+    provider: str
+    title: str
+    published_at: datetime
+    url: str
+    security_ids: List[str] = Field(default_factory=list)
+    group_ids: List[str] = Field(default_factory=list)
+    event_tags: List[str] = Field(default_factory=list)
+    metadata: Dict[str, str] = Field(default_factory=dict)
+
+
+class HeadlineRiskSignalsRequest(BaseModel):
+    headlines: List[HeadlineRiskSignalItem]
 
 
 class DisclosureReactionRequest(BaseModel):
@@ -189,6 +221,26 @@ class BacktestRunRequest(BaseModel):
     avg_daily_turnover_20d_krw: float
     bars: List[PriceBarQualityItem]
     initial_cash_krw: float = 100_000_000.0
+    strategy_plugin_id: str = "fixed-close"
+    strategy_parameters: Dict[str, Any] = Field(default_factory=dict)
+
+
+class ExportedSnapshotReplayRequest(BaseModel):
+    run_id: str
+    strategy_id: str
+    from_date: date
+    to_date: date
+    security_id: str
+    snapshot_paths: List[str]
+    market: str = "KR"
+    side: str = "buy"
+    order_type: str = "limit"
+    quantity: float = 1.0
+    avg_daily_turnover_20d_krw: float = 1_000_000_000.0
+    initial_cash_krw: float = 100_000_000.0
+    required_min_days: int = 1
+    strategy_plugin_id: str = "fixed-close"
+    strategy_parameters: Dict[str, Any] = Field(default_factory=dict)
 
 
 class ScenarioShockRequest(BaseModel):
@@ -212,7 +264,7 @@ class AuditEventRequest(BaseModel):
     target_type: str
     actor_id: Optional[str] = None
     target_id: Optional[str] = None
-    detail: Dict[str, str] = {}
+    detail: Dict[str, str] = Field(default_factory=dict)
 
 
 class ComponentStatusRequest(BaseModel):
@@ -252,6 +304,26 @@ class OrderSubmitRequest(BaseModel):
     idempotency_key: str
     broker_code: str = "paper"
     limit_price: Optional[float] = None
+
+
+def _bad_request(exc: Exception) -> HTTPException:
+    return HTTPException(status_code=400, detail=str(exc))
+
+
+def _missing_provider_settings(settings: AppSettings) -> List[str]:
+    missing = []
+    if not settings.opendart_api_key.strip():
+        missing.append("opendart")
+    if not settings.ecos_api_key.strip():
+        missing.append("ecos_bok")
+    user_agent = settings.sec_edgar_user_agent.strip().lower()
+    if not user_agent or "example.com" in user_agent:
+        missing.append("sec_edgar")
+    if not settings.krx_kind_smoke_enabled:
+        missing.append("krx_kind")
+    if not settings.krx_price_smoke_enabled:
+        missing.append("krx_data:market_data")
+    return missing
 
 
 @app.get("/health")
@@ -436,6 +508,43 @@ def geopolitical_alert(request: EventMarketAlertRequest) -> Dict[str, Any]:
     return {"alert": None if alert is None else alert.as_dict()}
 
 
+@app.post("/api/headlines/risk-signals")
+def headline_risk_signals(request: HeadlineRiskSignalsRequest) -> Dict[str, Any]:
+    clusters = deduplicate_headlines(
+        [
+            Headline(
+                provider=item.provider,
+                title=item.title,
+                published_at=item.published_at,
+                url=item.url,
+                security_ids=tuple(item.security_ids),
+                group_ids=tuple(item.group_ids),
+                event_tags=tuple(item.event_tags),
+                metadata=item.metadata,
+            )
+            for item in request.headlines
+        ]
+    )
+    signals = headline_clusters_to_event_risk_signals(clusters)
+    return {
+        "clusters": [cluster.as_dict() for cluster in clusters],
+        "signals": [
+            {
+                "event_id": signal.event_id,
+                "event_type": signal.event_type,
+                "severity": signal.severity,
+                "observed_at": signal.observed_at.isoformat(),
+                "security_ids": sorted(signal.security_ids),
+                "group_ids": sorted(signal.group_ids),
+                "expires_at": None
+                if signal.expires_at is None
+                else signal.expires_at.isoformat(),
+            }
+            for signal in signals
+        ],
+    }
+
+
 @app.post("/api/disclosures/impact-preview")
 def disclosure_impact_preview(request: DisclosureImpactRequest) -> Dict[str, Any]:
     pattern = analyze_disclosure_impacts(
@@ -510,17 +619,22 @@ def backtest_run(request: BacktestRunRequest) -> Dict[str, Any]:
         for item in request.bars
     ]
 
-    def strategy(bar: PriceBarInput) -> StrategyOrderCandidate:
-        return StrategyOrderCandidate(
-            security_id=request.security_id,
-            side=request.side,
-            market=request.market,
-            order_type=request.order_type,
-            price=float(bar.close_price or 0.0),
-            quantity=request.quantity,
-            decision_at=bar.bar_ts,
-            avg_daily_turnover_20d_krw=request.avg_daily_turnover_20d_krw,
+    try:
+        strategy = DEFAULT_STRATEGY_REGISTRY.build(
+            request.strategy_plugin_id,
+            StrategyContext(
+                strategy_id=request.strategy_id,
+                security_id=request.security_id,
+                market=request.market,
+                side=request.side,
+                order_type=request.order_type,
+                quantity=request.quantity,
+                avg_daily_turnover_20d_krw=request.avg_daily_turnover_20d_krw,
+                parameters=request.strategy_parameters,
+            ),
         )
+    except ValueError as exc:
+        raise _bad_request(exc) from exc
 
     result = run_backtest(
         BacktestRunConfig(
@@ -536,13 +650,49 @@ def backtest_run(request: BacktestRunRequest) -> Dict[str, Any]:
     return {
         "run_id": result.run_id,
         "status": result.status,
+        "strategy_plugin_id": request.strategy_plugin_id,
         "ending_cash_krw": result.ending_cash_krw,
         "realized_pnl_krw": result.realized_pnl_krw,
         "blocked_order_count": result.blocked_order_count,
         "lookahead_violation_count": result.lookahead_violation_count,
         "metrics": result.metrics,
+        "paper_replay_evidence": build_paper_replay_evidence(result).as_dict(),
         "order_events": [event.__dict__ for event in result.order_events],
     }
+
+
+@app.post("/api/backtests/replay-exported-snapshot")
+def backtest_replay_exported_snapshot(
+    request: ExportedSnapshotReplayRequest,
+) -> Dict[str, Any]:
+    try:
+        result = run_exported_snapshot_replay(
+            ExportedSnapshotReplayConfig(
+                run_id=request.run_id,
+                strategy_id=request.strategy_id,
+                from_date=request.from_date,
+                to_date=request.to_date,
+                security_id=request.security_id,
+                snapshot_paths=[Path(path) for path in request.snapshot_paths],
+                market=request.market,
+                side=request.side,
+                order_type=request.order_type,
+                quantity=request.quantity,
+                avg_daily_turnover_20d_krw=request.avg_daily_turnover_20d_krw,
+                initial_cash_krw=request.initial_cash_krw,
+                required_min_days=request.required_min_days,
+                strategy_plugin_id=request.strategy_plugin_id,
+                strategy_parameters=request.strategy_parameters,
+            )
+        )
+    except (FileNotFoundError, ValueError) as exc:
+        raise _bad_request(exc) from exc
+    return result.as_dict()
+
+
+@app.get("/api/backtests/strategy-plugins")
+def backtest_strategy_plugins() -> Dict[str, Any]:
+    return {"plugins": [plugin.as_dict() for plugin in DEFAULT_STRATEGY_REGISTRY.list_plugins()]}
 
 
 @app.post("/api/scenarios/shock")
@@ -566,6 +716,13 @@ def scenario_shock(request: ScenarioShockRequest) -> Dict[str, Any]:
 def operations_restore_check(request: RestoreCheckRequest) -> Dict[str, Any]:
     result = restore_check(Path(request.manifest_path))
     return result.__dict__
+
+
+@app.get("/api/operations/backup-status")
+def operations_backup_status(backup_base_dir: Optional[str] = None) -> Dict[str, Any]:
+    settings = AppSettings.from_env()
+    base_dir = Path(backup_base_dir or settings.backup_base_dir)
+    return summarize_backup_restore_status(base_dir).as_dict()
 
 
 @app.post("/api/audit/events")
@@ -609,6 +766,40 @@ def operations_summary(request: OperationsSummaryRequest) -> Dict[str, Any]:
         ]
     )
     return summary.as_dict()
+
+
+@app.get("/api/operations/provider-health")
+def operations_provider_health() -> Dict[str, Any]:
+    settings = AppSettings.from_env()
+    summary = summarize_operations(
+        provider_health_components(
+            default_mvp_provider_catalog(),
+            missing_credentials=_missing_provider_settings(settings),
+        )
+    )
+    return summary.as_dict()
+
+
+@app.get("/api/providers/catalog")
+def provider_catalog() -> Dict[str, Any]:
+    providers = []
+    for provider in default_mvp_provider_catalog():
+        policy = license_policy_from_provider(provider)
+        providers.append(
+            {
+                "provider_code": provider.provider_code,
+                "provider_type": provider.provider_type,
+                "priority": provider.priority,
+                "license_policy": {
+                    "license_name": policy.license_name,
+                    "can_store": policy.can_store,
+                    "can_transform": policy.can_transform,
+                    "can_display_realtime": policy.can_display_realtime,
+                    "can_redistribute": policy.can_redistribute,
+                },
+            }
+        )
+    return {"providers": providers}
 
 
 @app.post("/api/verification/gates/assess")
