@@ -9,6 +9,7 @@ from silver_platter.business_groups import (
     normalized_group_volatility_changes,
 )
 from silver_platter.config import AppSettings
+from silver_platter.data_quality import PriceBarInput, evaluate_price_bars
 from silver_platter.disclosures import (
     DisclosureReaction,
     analyze_disclosure_impacts,
@@ -106,6 +107,19 @@ class OverseasRealizedTradeRequest(BaseModel):
 class OverseasTaxEstimateRequest(BaseModel):
     tax_year: int
     trades: List[OverseasRealizedTradeRequest]
+
+
+class PriceBarQualityRequest(BaseModel):
+    bars: List["PriceBarQualityItem"]
+
+
+class PriceBarQualityItem(BaseModel):
+    security_id: str
+    bar_ts: datetime
+    close_price: Optional[float]
+    volume: Optional[float]
+    turnover_krw: Optional[float]
+    available_to_model_at: Optional[datetime]
 
 
 @app.get("/health")
@@ -231,3 +245,21 @@ def overseas_capital_gains_tax(
         request.tax_year,
     )
     return estimate.as_dict()
+
+
+@app.post("/api/data/price-bars/quality")
+def price_bar_quality(request: PriceBarQualityRequest) -> Dict[str, Any]:
+    result = evaluate_price_bars(
+        [
+            PriceBarInput(
+                security_id=item.security_id,
+                bar_ts=item.bar_ts,
+                close_price=item.close_price,
+                volume=item.volume,
+                turnover_krw=item.turnover_krw,
+                available_to_model_at=item.available_to_model_at,
+            )
+            for item in request.bars
+        ]
+    )
+    return result.as_dict()

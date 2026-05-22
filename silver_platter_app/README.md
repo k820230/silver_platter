@@ -16,6 +16,7 @@ All project artifacts are managed under `/home/jhkim5/silver_platter`. Do not cr
 - User-designated security ML forecast baseline
 - Disclosure impact preview helper
 - FIFO realized PnL and overseas stock capital gains tax support estimate helper
+- Data provider interface, reference/disclosure/FX ingestion helpers, quality manifest, and partitioned export helper
 
 ## Local Commands
 
