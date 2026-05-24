@@ -133,3 +133,53 @@ class ScriptHelperTests(TestCase):
             self.assertIn("ready: long replay snapshot", result.stdout)
             self.assertIn("ready: G7 live/paper smoke approval", result.stdout)
             self.assertIn("external smoke readiness passed", result.stdout)
+
+    def test_prepare_long_replay_snapshot_writes_replayable_jsonl(self):
+        script = Path(__file__).resolve().parents[1] / "scripts" / "prepare_long_replay_snapshot"
+        replay_script = Path(__file__).resolve().parents[1] / "scripts" / "replay_exported_snapshot"
+        with TemporaryDirectory() as tmp:
+            snapshot = Path(tmp) / "long_replay_sample.jsonl"
+            result = subprocess.run(
+                [str(script)],
+                cwd=Path(__file__).resolve().parents[1],
+                env={
+                    **os.environ,
+                    "LONG_REPLAY_SNAPSHOT_PATH": str(snapshot),
+                    "PYTHONPATH": "src",
+                },
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertTrue(snapshot.exists())
+            self.assertIn("LONG_REPLAY_SNAPSHOT_PATH=%s" % snapshot, result.stdout)
+
+            replay = subprocess.run(
+                [
+                    str(replay_script),
+                    "--run-id",
+                    "test-long-replay",
+                    "--strategy-id",
+                    "test",
+                    "--from-date",
+                    "2026-01-02",
+                    "--to-date",
+                    "2026-05-22",
+                    "--security-id",
+                    "005930",
+                    "--snapshot-path",
+                    str(snapshot),
+                    "--required-min-days",
+                    "30",
+                ],
+                cwd=Path(__file__).resolve().parents[1],
+                env={**os.environ, "PYTHONPATH": "src"},
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertIn('"loaded_bar_count": 101', replay.stdout)
+            self.assertIn('"status": "completed"', replay.stdout)
+            self.assertIn('"status": "pass"', replay.stdout)

@@ -1,0 +1,50 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+cd "$(dirname "$0")/.."
+
+requested_target="${LONG_REPLAY_SNAPSHOT_PATH:-${REPLAY_SNAPSHOT_PATH:-}}"
+. scripts/load_local_env
+
+default_root="${RAW_DATA_DIR:-/home/jhkim5/silver_platter_data/raw}/replay_snapshots"
+target="${requested_target:-${LONG_REPLAY_SNAPSHOT_PATH:-${REPLAY_SNAPSHOT_PATH:-${default_root}/long_replay_sample.jsonl}}}"
+
+LONG_REPLAY_SNAPSHOT_TARGET="${target}" PYTHONPATH=src python3 - <<'PY'
+from datetime import date, datetime, time, timedelta
+import json
+import os
+from pathlib import Path
+
+target = Path(os.environ["LONG_REPLAY_SNAPSHOT_TARGET"]).expanduser()
+target.parent.mkdir(parents=True, exist_ok=True)
+
+rows = []
+current = date(2026, 1, 2)
+end = date(2026, 5, 22)
+index = 0
+while current <= end:
+    if current.weekday() < 5:
+        close_price = 70000 + index * 170 + ((index % 9) - 4) * 80
+        bar_ts = datetime.combine(current, time(16, 0, 0))
+        available_at = bar_ts
+        volume = 900000 + (index % 13) * 25000
+        rows.append(
+            {
+                "security_id": "005930",
+                "bar_ts": bar_ts.isoformat(),
+                "close_price": float(close_price),
+                "volume": float(volume),
+                "turnover_krw": float(close_price * volume),
+                "available_to_model_at": available_at.isoformat(),
+            }
+        )
+        index += 1
+    current += timedelta(days=1)
+
+payload = "\n".join(
+    json.dumps(row, ensure_ascii=True, sort_keys=True) for row in rows
+)
+target.write_text(payload + "\n", encoding="utf-8")
+print("LONG_REPLAY_SNAPSHOT_PATH=%s" % target)
+print("row_count=%s" % len(rows))
+PY
