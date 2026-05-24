@@ -89,6 +89,7 @@
 - verification/alert repository SQL command generation
 - headline repository SQL command generation
 - order state
+- broker timeout reconciliation
 - broker order service
 - KIS guarded OAuth/order/orderability payload mapping
 - risk controls
@@ -171,7 +172,7 @@
 - verification status UI card
 - migration coverage
 
-현재 테스트 수: 210개
+현재 테스트 수: 211개
 
 ## 7. 검증 증적
 

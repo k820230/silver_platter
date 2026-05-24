@@ -147,7 +147,7 @@
 | idempotency 중복 주문 방지 | [x] |
 | 부분체결 처리 | [x] |
 | 취소/정정 처리 | [x] |
-| broker timeout reconciliation | [ ] |
+| broker timeout reconciliation | [x] |
 | 주문 가능 시간 확인 | [ ] |
 | simulation 주문 broker 미전송 | [x] |
 | paper/live 모드 명확히 분리 | [x] |

@@ -36,6 +36,7 @@
 추가 기능:
 
 - `draft -> previewed -> submitted -> accepted/filled/rejected` 상태 전이
+- broker timeout reconciliation 상태 전이
 - terminal state 보호
 - invalid transition 차단
 - idempotency key registry
@@ -129,6 +130,7 @@
 - sell posting의 FIFO matching과 realized PnL
 - reconciliation mismatch report
 - 정상/비정상 주문 상태 전이
+- broker timeout reconciliation filled 상태 반영
 - idempotency duplicate 차단
 - paper broker live 미전송
 - KIS live disabled rejected

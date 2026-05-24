@@ -22,7 +22,14 @@ ALLOWED_TRANSITIONS: Dict[str, FrozenSet[str]] = {
     ORDER_DRAFT: frozenset({ORDER_PREVIEWED, ORDER_REJECTED, ORDER_EXPIRED}),
     ORDER_PREVIEWED: frozenset({ORDER_SUBMITTED, ORDER_REJECTED, ORDER_EXPIRED}),
     ORDER_SUBMITTED: frozenset(
-        {ORDER_ACCEPTED, ORDER_REJECTED, ORDER_CANCEL_REQUESTED, ORDER_EXPIRED}
+        {
+            ORDER_ACCEPTED,
+            ORDER_PARTIALLY_FILLED,
+            ORDER_FILLED,
+            ORDER_REJECTED,
+            ORDER_CANCEL_REQUESTED,
+            ORDER_EXPIRED,
+        }
     ),
     ORDER_ACCEPTED: frozenset(
         {
@@ -65,6 +72,14 @@ class OrderStateEvent:
     occurred_at: datetime
     reason: Optional[str] = None
     filled_quantity_delta: float = 0.0
+
+
+@dataclass(frozen=True)
+class BrokerReconciliationSnapshot:
+    order_id: str
+    broker_status: str
+    filled_quantity: float = 0.0
+    reason: str = ""
 
 
 @dataclass(frozen=True)
@@ -140,3 +155,35 @@ def transition_order_state(
         filled_quantity_delta=filled_quantity_delta,
     )
     return next_record, event
+
+
+def reconcile_broker_timeout(
+    record: OrderStateRecord,
+    snapshot: BrokerReconciliationSnapshot,
+    now: Optional[datetime] = None,
+) -> Tuple[OrderStateRecord, OrderStateEvent]:
+    if snapshot.order_id != record.order_id:
+        raise ValueError("broker reconciliation snapshot order_id must match order")
+    normalized_status = snapshot.broker_status.strip().lower()
+    status_map = {
+        "accepted": ORDER_ACCEPTED,
+        "open": ORDER_ACCEPTED,
+        "submitted": ORDER_ACCEPTED,
+        "partial": ORDER_PARTIALLY_FILLED,
+        "partially_filled": ORDER_PARTIALLY_FILLED,
+        "filled": ORDER_FILLED,
+        "cancelled": ORDER_CANCELLED,
+        "canceled": ORDER_CANCELLED,
+        "rejected": ORDER_REJECTED,
+        "expired": ORDER_EXPIRED,
+    }
+    if normalized_status not in status_map:
+        raise ValueError("unsupported broker reconciliation status: %s" % snapshot.broker_status)
+    filled_delta = max(0.0, snapshot.filled_quantity - record.filled_quantity)
+    return transition_order_state(
+        record,
+        status_map[normalized_status],
+        snapshot.reason or "broker_timeout_reconciliation",
+        filled_quantity_delta=filled_delta,
+        now=now,
+    )
