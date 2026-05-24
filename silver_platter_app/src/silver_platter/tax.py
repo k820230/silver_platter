@@ -30,6 +30,18 @@ class OverseasCapitalGainsTaxEstimate:
         return self.__dict__.copy()
 
 
+@dataclass(frozen=True)
+class TaxEstimateComparison:
+    tax_year: int
+    preview_estimated_tax_krw: float
+    actual_estimated_tax_krw: float
+    delta_krw: float
+    delta_pct: float
+
+    def as_dict(self) -> dict:
+        return self.__dict__.copy()
+
+
 def estimate_overseas_capital_gains_tax(
     trades: Iterable[OverseasRealizedTrade],
     tax_year: int,
@@ -60,4 +72,24 @@ def estimate_overseas_capital_gains_tax(
         national_income_tax_krw=round(national_tax, 2),
         local_income_tax_krw=round(local_tax, 2),
         estimated_tax_krw=round(estimated_tax, 2),
+    )
+
+
+def compare_tax_preview_to_actual(
+    preview: OverseasCapitalGainsTaxEstimate,
+    actual: OverseasCapitalGainsTaxEstimate,
+) -> TaxEstimateComparison:
+    if preview.tax_year != actual.tax_year:
+        raise ValueError("tax estimate comparison requires the same tax_year")
+    delta = actual.estimated_tax_krw - preview.estimated_tax_krw
+    return TaxEstimateComparison(
+        tax_year=preview.tax_year,
+        preview_estimated_tax_krw=preview.estimated_tax_krw,
+        actual_estimated_tax_krw=actual.estimated_tax_krw,
+        delta_krw=round(delta, 2),
+        delta_pct=(
+            0.0
+            if preview.estimated_tax_krw == 0
+            else round(delta / preview.estimated_tax_krw, 6)
+        ),
     )

@@ -83,6 +83,7 @@
 - data_license repository SQL command generation
 - accounting posting
 - unrealized PnL calculation
+- tax preview-to-actual comparison
 - currency exposure calculation
 - risk check result repository writer
 - audit/order/backtest repository SQL command generation
@@ -173,7 +174,7 @@
 - verification status UI card
 - migration coverage
 
-현재 테스트 수: 212개
+현재 테스트 수: 213개
 
 ## 7. 검증 증적
 

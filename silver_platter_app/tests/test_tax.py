@@ -1,7 +1,11 @@
 from datetime import date
 from unittest import TestCase
 
-from silver_platter.tax import OverseasRealizedTrade, estimate_overseas_capital_gains_tax
+from silver_platter.tax import (
+    OverseasRealizedTrade,
+    compare_tax_preview_to_actual,
+    estimate_overseas_capital_gains_tax,
+)
 
 
 class TaxTests(TestCase):
@@ -20,3 +24,18 @@ class TaxTests(TestCase):
         self.assertEqual(4_500_000, estimate.net_gain_krw)
         self.assertEqual(2_000_000, estimate.taxable_gain_krw)
         self.assertEqual(440_000, estimate.estimated_tax_krw)
+
+    def test_compares_preview_and_actual_tax_estimates(self):
+        preview = estimate_overseas_capital_gains_tax(
+            [OverseasRealizedTrade("AAPL", "US", date(2026, 3, 1), 4_500_000)],
+            2026,
+        )
+        actual = estimate_overseas_capital_gains_tax(
+            [OverseasRealizedTrade("AAPL", "US", date(2026, 3, 1), 5_000_000)],
+            2026,
+        )
+
+        comparison = compare_tax_preview_to_actual(preview, actual)
+
+        self.assertEqual(110_000, comparison.delta_krw)
+        self.assertGreater(comparison.delta_pct, 0)
