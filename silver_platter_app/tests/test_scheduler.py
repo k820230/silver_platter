@@ -7,6 +7,8 @@ from silver_platter.worker.scheduler import (
     MonthlySchedule,
     next_monthly_run_after,
     next_weekly_run_after,
+    scheduler_now,
+    scheduler_timezone,
 )
 
 
@@ -20,6 +22,16 @@ class SchedulerTests(TestCase):
         result = next_weekly_run_after(datetime(2026, 5, 23, 10, 1, 0), MVP_BACKUP_SCHEDULE)
 
         self.assertEqual(datetime(2026, 5, 30, 10, 0, 0), result)
+
+    def test_next_weekly_run_after_preserves_timezone(self):
+        timezone = scheduler_timezone("Asia/Seoul")
+        result = next_weekly_run_after(
+            datetime(2026, 5, 23, 9, 0, 0, tzinfo=timezone),
+            MVP_BACKUP_SCHEDULE,
+        )
+
+        self.assertEqual("2026-05-23T10:00:00+09:00", result.isoformat())
+        self.assertIs(timezone, result.tzinfo)
 
     def test_next_monthly_run_after_returns_same_day_when_before_schedule(self):
         result = next_monthly_run_after(
@@ -44,3 +56,12 @@ class SchedulerTests(TestCase):
         )
 
         self.assertEqual(datetime(2026, 2, 28, 10, 0, 0), result)
+
+    def test_scheduler_now_uses_configured_timezone(self):
+        result = scheduler_now("Asia/Seoul")
+
+        self.assertEqual("Asia/Seoul", result.tzinfo.tzname(result))
+
+    def test_scheduler_timezone_rejects_unknown_timezone(self):
+        with self.assertRaises(ValueError):
+            scheduler_timezone("America/New_York")

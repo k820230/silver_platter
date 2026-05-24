@@ -83,6 +83,7 @@
 - 현재 시각 이후 다음 백업 예정 시각 계산
 - 현재 시각 이후 다음 restore drill 예정 시각 계산
 - 월말 길이가 짧은 달의 restore drill 일자 보정
+- scheduler startup time을 `APP_TIMEZONE` 기준 aware datetime으로 계산
 - scheduler startup log에 다음 백업 예정 시각 표시
 
 ## 4. 테스트
@@ -118,6 +119,7 @@
 - backup manifest final base path recording for staging writes
 - backup manifest checksum path-stable hash 기록
 - in-progress backup manifest discovery 제외
+- nested backup content manifest discovery 제외
 - backup execution lock 중복 acquire 방지
 - backup wrapper lock smoke
 - backup wrapper configured command manifest/restore smoke
@@ -140,9 +142,12 @@
 - empty backup manifest 실패 검출
 - invalid backup manifest JSON 실패 검출
 - invalid backup manifest root/files type 실패 검출
+- invalid backup manifest root status 실패 흡수
+- invalid backup manifest base path type 실패 검출
 - backup manifest base path escape 실패 검출
 - backup manifest directory entry 실패 검출
 - 토요일 10:00 다음 실행 시각 계산
+- scheduler KST timezone 보존
 - 매월 restore drill 다음 실행 시각 계산
 - 31일 schedule의 짧은 달 마지막 일자 보정
 

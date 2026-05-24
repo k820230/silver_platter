@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 import calendar
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from silver_platter.config import AppSettings
 
@@ -88,9 +88,21 @@ def next_monthly_run_after(
     return candidate
 
 
+def scheduler_timezone(timezone_name: str) -> timezone:
+    if timezone_name == "Asia/Seoul":
+        return timezone(timedelta(hours=9), timezone_name)
+    if timezone_name in {"UTC", "Etc/UTC"}:
+        return timezone.utc
+    raise ValueError("unsupported scheduler timezone: %s" % timezone_name)
+
+
+def scheduler_now(timezone_name: str) -> datetime:
+    return datetime.now(scheduler_timezone(timezone_name))
+
+
 def main() -> None:
     settings = AppSettings.from_env()
-    now = datetime.utcnow()
+    now = scheduler_now(settings.app_timezone)
     next_backup = next_weekly_run_after(now)
     next_restore_drill = next_monthly_run_after(now)
     print(

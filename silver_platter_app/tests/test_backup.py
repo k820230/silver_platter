@@ -197,6 +197,17 @@ class BackupTests(TestCase):
         self.assertEqual("failed", result.status)
         self.assertIn("manifest root is not an object", result.issues)
 
+    def test_backup_restore_status_critical_when_manifest_root_is_not_object(self):
+        with TemporaryDirectory() as tmp:
+            manifest_path = Path(tmp) / "manifest.json"
+            manifest_path.write_text("[]", encoding="utf-8")
+
+            status = summarize_backup_restore_status(Path(tmp))
+
+        self.assertEqual("critical", status.status)
+        self.assertEqual("failed", status.restore_status)
+        self.assertIn("manifest root is not an object", status.issues)
+
     def test_restore_check_fails_when_manifest_files_is_not_list(self):
         with TemporaryDirectory() as tmp:
             manifest_path = Path(tmp) / "manifest.json"
@@ -218,6 +229,26 @@ class BackupTests(TestCase):
 
         self.assertEqual("failed", result.status)
         self.assertIn("manifest files is not a list", result.issues)
+
+    def test_restore_check_rejects_invalid_base_path_type(self):
+        with TemporaryDirectory() as tmp:
+            base = Path(tmp) / "backup"
+            data = base / "goldilocks" / "data" / "part.dat"
+            data.parent.mkdir(parents=True)
+            data.write_text("payload", encoding="utf-8")
+            manifest_path = base / "manifest.json"
+            write_backup_manifest(
+                build_backup_manifest(base, date(2026, 5, 23)),
+                manifest_path,
+            )
+            payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+            payload["base_path"] = ["bad"]
+            manifest_path.write_text(json.dumps(payload), encoding="utf-8")
+
+            result = restore_check(manifest_path)
+
+        self.assertEqual("failed", result.status)
+        self.assertIn("manifest base_path is invalid", result.issues)
 
     def test_restore_check_rejects_manifest_paths_that_escape_base(self):
         with TemporaryDirectory() as tmp:
@@ -367,6 +398,31 @@ class BackupTests(TestCase):
                 manifest_base_path=base / "2026-05-23",
             )
             write_backup_manifest(staged_manifest, staged / "manifest.json")
+
+            latest = find_latest_backup_manifest(base)
+            status = summarize_backup_restore_status(
+                base,
+                checked_at=datetime(2026, 5, 23, 10, 0, 0),
+            )
+
+        self.assertEqual(current_manifest_path, latest)
+        self.assertEqual("ok", status.status)
+        self.assertEqual(str(current_manifest_path), status.latest_manifest_path)
+
+    def test_latest_manifest_ignores_nested_backup_content_manifest(self):
+        with TemporaryDirectory() as tmp:
+            base = Path(tmp)
+            current = base / "2026-05-22"
+            current_data = current / "goldilocks" / "data" / "part.dat"
+            current_data.parent.mkdir(parents=True)
+            current_data.write_text("payload", encoding="utf-8")
+            current_manifest = build_backup_manifest(current, date(2026, 5, 22))
+            current_manifest_path = current / "manifest.json"
+            write_backup_manifest(current_manifest, current_manifest_path)
+
+            nested_manifest = base / "2026-05-23" / "goldilocks" / "manifest.json"
+            nested_manifest.parent.mkdir(parents=True)
+            nested_manifest.write_text("{not-json", encoding="utf-8")
 
             latest = find_latest_backup_manifest(base)
             status = summarize_backup_restore_status(

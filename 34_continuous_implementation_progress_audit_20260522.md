@@ -108,12 +108,15 @@
 - backup manifest staging final-base-path recording
 - backup manifest checksum path-stable hash validation
 - in-progress backup manifest ignored by status discovery
+- nested backup content manifest ignored by status discovery
 - backup restore check manifest checksum validation
 - backup restore check manifest checksum success path
 - backup wrapper configured command, no-fake-manifest skip, invalid-date preflight, root-dir guard, empty-output rejection, failed-rerun preservation, successful-rerun replacement, failure cleanup, and existing lock exit
 - backup execution lock
 - backup restore check empty/invalid manifest failure
 - backup restore check invalid manifest type failure
+- backup restore status non-object manifest failure
+- backup restore check invalid base path failure
 - backup restore check path escape/directory entry failure
 - backup/restore status summary
 - stale backup status degradation
@@ -128,13 +131,14 @@
 - provider health license-policy detail
 - scheduler
 - monthly restore drill scheduler
+- scheduler startup KST timezone handling
 - alert delivery
 - verification gate
 - G6 paper replay gate evidence
 - G7 live safety gate evidence
 - migration coverage
 
-현재 테스트 수: 167개
+현재 테스트 수: 173개
 
 ## 7. 검증 증적
 

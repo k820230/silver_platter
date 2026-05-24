@@ -173,6 +173,8 @@ def write_backup_manifest(manifest: BackupManifest, manifest_path: Path) -> None
 def _manifest_sort_key(path: Path) -> tuple:
     try:
         payload = json.loads(path.read_text(encoding="utf-8"))
+        if not isinstance(payload, dict):
+            return "", "", str(path)
         backup_date = str(payload.get("backup_date", ""))
         created_at = str(payload.get("created_at", ""))
         return backup_date, created_at, str(path)
@@ -187,12 +189,18 @@ def _is_in_progress_backup_path(path: Path) -> bool:
 def find_latest_backup_manifest(base_path: Path) -> Optional[Path]:
     if not base_path.exists():
         return None
+    candidates: List[Path] = []
+    root_manifest = base_path / "manifest.json"
+    if root_manifest.exists() and not _is_in_progress_backup_path(root_manifest):
+        candidates.append(root_manifest)
+    for child in base_path.iterdir():
+        if not child.is_dir() or _is_in_progress_backup_path(child):
+            continue
+        manifest = child / "manifest.json"
+        if manifest.exists():
+            candidates.append(manifest)
     manifests = sorted(
-        [
-            path
-            for path in base_path.rglob("manifest.json")
-            if not _is_in_progress_backup_path(path)
-        ],
+        candidates,
         key=_manifest_sort_key,
     )
     return manifests[-1] if manifests else None
@@ -239,7 +247,11 @@ def restore_check(manifest_path: Path) -> RestoreCheckResult:
             expected_manifest_checksum = ""
         if expected_manifest_checksum != sha256_file(manifest_path):
             issues.append("manifest checksum mismatch")
-    base_path = Path(payload.get("base_path", manifest_path.parent))
+    base_path_value = payload.get("base_path", str(manifest_path.parent))
+    if not isinstance(base_path_value, str) or not base_path_value:
+        issues.append("manifest base_path is invalid")
+        base_path_value = str(manifest_path.parent)
+    base_path = Path(base_path_value)
     base_path_resolved = base_path.resolve(strict=False)
     if payload.get("dbms") != "goldilocks":
         issues.append("manifest dbms is not goldilocks")
