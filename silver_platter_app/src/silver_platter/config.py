@@ -1,5 +1,26 @@
 from dataclasses import dataclass
 import os
+import re
+
+
+_SEC_EDGAR_EMAIL_RE = re.compile(
+    r"\b[A-Z0-9._%+-]+@([A-Z0-9.-]+\.[A-Z]{2,})\b",
+    re.IGNORECASE,
+)
+_PLACEHOLDER_EMAIL_DOMAINS = {"example.com", "example.net", "example.org"}
+
+
+def sec_edgar_user_agent_has_real_contact(user_agent: str) -> bool:
+    text = user_agent.strip()
+    if not text:
+        return False
+    match = _SEC_EDGAR_EMAIL_RE.search(text)
+    if match is None:
+        return False
+    domain = match.group(1).lower()
+    return domain not in _PLACEHOLDER_EMAIL_DOMAINS and not domain.endswith(
+        tuple("." + placeholder for placeholder in _PLACEHOLDER_EMAIL_DOMAINS)
+    )
 
 
 def _bool_from_env(name: str, default: bool) -> bool:

@@ -2,7 +2,7 @@ import os
 import unittest
 from unittest.mock import patch
 
-from silver_platter.config import AppSettings
+from silver_platter.config import AppSettings, sec_edgar_user_agent_has_real_contact
 
 
 class ConfigTest(unittest.TestCase):
@@ -31,6 +31,23 @@ class ConfigTest(unittest.TestCase):
     def test_goldilocks_listen_port_fallback(self):
         with patch.dict(os.environ, {"GOLDILOCKS_LISTEN_PORT": "11100"}, clear=True):
             self.assertEqual(AppSettings.from_env().goldilocks.port, 11100)
+
+    def test_sec_edgar_user_agent_contact_validation(self):
+        self.assertTrue(
+            sec_edgar_user_agent_has_real_contact(
+                "Silver Platter ops@silverplatter.dev"
+            )
+        )
+        self.assertFalse(sec_edgar_user_agent_has_real_contact(""))
+        self.assertFalse(sec_edgar_user_agent_has_real_contact("Silver Platter"))
+        self.assertFalse(
+            sec_edgar_user_agent_has_real_contact("Silver Platter admin@example.com")
+        )
+        self.assertFalse(
+            sec_edgar_user_agent_has_real_contact(
+                "Silver Platter admin@team.example.org"
+            )
+        )
 
 
 if __name__ == "__main__":

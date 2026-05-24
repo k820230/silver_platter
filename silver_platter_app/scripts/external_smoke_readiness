@@ -15,10 +15,13 @@ block() {
 }
 
 user_agent="${SEC_EDGAR_USER_AGENT:-}"
-if [ -n "${user_agent}" ] && ! printf '%s' "${user_agent}" | grep -qi 'example.com'; then
+user_agent_lc="$(printf '%s' "${user_agent}" | tr '[:upper:]' '[:lower:]')"
+if [ -n "${user_agent}" ] \
+  && printf '%s' "${user_agent}" | grep -Eqi '[[:alnum:]._%+-]+@[[:alnum:].-]+\.[[:alpha:]]{2,}' \
+  && ! printf '%s' "${user_agent_lc}" | grep -Eqi '@([^[:space:]]+\.)?example\.(com|net|org)([^[:alnum:].-]|$)'; then
   ready "SEC EDGAR User-Agent"
 else
-  block "SEC EDGAR User-Agent" "set SEC_EDGAR_USER_AGENT to a real contact User-Agent"
+  block "SEC EDGAR User-Agent" "set SEC_EDGAR_USER_AGENT to a contact User-Agent with a real email address"
 fi
 
 if [ -n "${OPENDART_API_KEY:-}" ]; then

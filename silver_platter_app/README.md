@@ -70,7 +70,7 @@ Set `WATCHLIST_STORE_PATH` to persist API watchlist changes to a local JSON file
 `./scripts/goldilocks_repository_smoke` rolls back provider/license/audit/scenario/restore/headline writer checks and skips unless `GOLDILOCKS_REPOSITORY_SMOKE_WRITE=1` plus Goldilocks ODBC are configured.
 `./scripts/goldilocks_backup.sh` uses `BACKUP_BASE_DIR`, `GOLDILOCKS_BACKUP_POLICY`, and `GOLDILOCKS_BACKUP_COMMAND`; it runs the configured command inside a dated backup directory, writes a checksum-backed manifest only when backup files are produced, and skips without creating a fake manifest when no command is configured.
 `./scripts/kis_orderable_smoke` is read-only and skips unless KIS query credentials and `KIS_API_BASE_URL` are configured.
-`./scripts/sec_edgar_smoke` is read-only and skips unless `SEC_EDGAR_USER_AGENT` is set to a real contact User-Agent.
+`./scripts/sec_edgar_smoke` is read-only and skips unless `SEC_EDGAR_USER_AGENT` contains a real contact email.
 `./scripts/opendart_smoke` is read-only and skips unless `OPENDART_API_KEY` is configured.
 `./scripts/krx_kind_smoke` is read-only and skips unless `KRX_KIND_SMOKE_ENABLED=1` is configured.
 `./scripts/krx_price_smoke` is read-only and skips unless `KRX_PRICE_SMOKE_ENABLED=1` is configured.

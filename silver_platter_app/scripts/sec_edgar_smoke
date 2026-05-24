@@ -4,13 +4,16 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 PYTHONPATH=src python3 - <<'PY'
-from silver_platter.config import AppSettings
+from silver_platter.config import AppSettings, sec_edgar_user_agent_has_real_contact
 from silver_platter.providers import SecEdgarDisclosureProvider
 
 settings = AppSettings.from_env()
 user_agent = settings.sec_edgar_user_agent.strip()
-if not user_agent or "example.com" in user_agent.lower():
-    print("SEC EDGAR smoke skipped: set SEC_EDGAR_USER_AGENT to a real contact User-Agent")
+if not sec_edgar_user_agent_has_real_contact(user_agent):
+    print(
+        "SEC EDGAR smoke skipped: set SEC_EDGAR_USER_AGENT to a contact "
+        "User-Agent with a real email address"
+    )
     raise SystemExit(0)
 
 provider = SecEdgarDisclosureProvider(

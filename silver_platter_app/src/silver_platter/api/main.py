@@ -10,7 +10,7 @@ from silver_platter.business_groups import (
     VolatilityObservation,
     normalized_group_volatility_changes,
 )
-from silver_platter.config import AppSettings
+from silver_platter.config import AppSettings, sec_edgar_user_agent_has_real_contact
 from silver_platter.charting import IndexObservation, build_index_chart_series
 from silver_platter.data_quality import PriceBarInput, evaluate_price_bars
 from silver_platter.disclosures import (
@@ -369,8 +369,7 @@ def _missing_provider_settings(settings: AppSettings) -> List[str]:
         missing.append("opendart")
     if not settings.ecos_api_key.strip():
         missing.append("ecos_bok")
-    user_agent = settings.sec_edgar_user_agent.strip().lower()
-    if not user_agent or "example.com" in user_agent:
+    if not sec_edgar_user_agent_has_real_contact(settings.sec_edgar_user_agent):
         missing.append("sec_edgar")
     if not settings.krx_kind_smoke_enabled:
         missing.append("krx_kind")
