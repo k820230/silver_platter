@@ -203,8 +203,8 @@
 
 | 항목 | 확인 |
 | --- | --- |
-| `/home/jhkim5/backup_sp` 존재 | [ ] |
-| 백업 경로 권한 | [ ] |
+| `/home/jhkim5/backup_sp` 존재 | [x] |
+| 백업 경로 권한 | [x] |
 | 토요일 10:00 KST schedule | [x] |
 | 날짜별 폴더 생성 | [x] |
 | manifest 생성 | [x] |

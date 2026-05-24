@@ -202,6 +202,8 @@
 - `./scripts/scheduler_smoke`
 - `./scripts/guarded_smoke`
 - `./scripts/collect_verification_evidence --skip-check --backup-base-dir /tmp/silver-platter-missing-backup --output /tmp/silver-platter-evidence-bundle.json`
+- `/home/jhkim5/backup_sp` path/access 확인: exists/read/write/execute ok
+- Docker daemon 확인: `/var/run/docker.sock` permission denied
 - `./scripts/migrate plan`
 - `./scripts/migrate apply --dry-run`
 - `./scripts/goldilocks_odbc_smoke` skip 확인: ODBC 설정 없음
