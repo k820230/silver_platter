@@ -71,7 +71,7 @@ Set `WATCHLIST_STORE_PATH` to persist API watchlist changes to a local JSON file
 `./scripts/goldilocks_repository_smoke` rolls back provider/license/audit/scenario/restore/headline writer checks and skips unless `GOLDILOCKS_REPOSITORY_SMOKE_WRITE=1` plus Goldilocks ODBC are configured.
 `./scripts/goldilocks_backup.sh` uses `BACKUP_BASE_DIR`, `GOLDILOCKS_BACKUP_POLICY`, and `GOLDILOCKS_BACKUP_COMMAND`; it runs the configured command inside a dated backup directory, writes a checksum-backed manifest only when backup files are produced, and skips without creating a fake manifest when no command is configured.
 `./scripts/kis_orderable_smoke` is read-only and skips unless KIS query credentials and `KIS_API_BASE_URL` are configured.
-`POST /api/securities/search` and new `POST /api/watchlist/items` securities prefetch KR domestic daily price history through KIS and store it in Goldilocks `SP.price_bar` when KIS query credentials and Goldilocks ODBC are configured.
+`POST /api/securities/search` and new `POST /api/watchlist/items` securities prefetch KR domestic daily price history through KIS and store it in Goldilocks `SP.price_bar` when KIS query credentials and Goldilocks ODBC are configured. KIS access tokens are reused through `KIS_TOKEN_CACHE_PATH` or the default `RAW_DATA_DIR/kis_access_token.json` cache to avoid repeated OAuth issuance.
 `./scripts/history_prefetch_smoke` verifies the same DB-backed history prefetch path and skips unless `HISTORY_PREFETCH_SMOKE_ENABLED=1` is configured.
 `./scripts/sec_edgar_smoke` is read-only and skips unless `SEC_EDGAR_USER_AGENT` contains a real contact email.
 `./scripts/opendart_smoke` is read-only and skips unless `OPENDART_API_KEY` is configured.

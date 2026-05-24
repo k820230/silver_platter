@@ -486,6 +486,7 @@ def _prefetch_history_for_security(
             start_date=start,
             end_date=end,
             access_token=os.getenv("KIS_ACCESS_TOKEN", "").strip() or None,
+            token_cache_path=_kis_token_cache_path(settings),
         )
         result = HistoricalPricePrefetcher(
             GoldilocksRepository(connection)
@@ -513,6 +514,13 @@ def _prefetch_history_for_security(
             market_code=security.market_code,
             provider_code="kis_domestic_daily_price",
         )
+
+
+def _kis_token_cache_path(settings: AppSettings) -> str:
+    configured_path = os.getenv("KIS_TOKEN_CACHE_PATH", "").strip()
+    if configured_path:
+        return configured_path
+    return str(Path(settings.raw_data_dir) / "kis_access_token.json")
 
 
 @app.get("/health")

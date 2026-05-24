@@ -8,7 +8,7 @@ import urllib.parse
 import urllib.request
 import zlib
 from dataclasses import dataclass
-from datetime import date, datetime, time
+from datetime import date, datetime, time, timedelta
 from pathlib import Path
 from typing import Any, Callable, Dict, Iterable, List, Optional, Sequence, Tuple
 
@@ -579,6 +579,7 @@ class KoreaInvestmentDailyPriceProvider(MarketDataProvider):
         start_date: date,
         end_date: date,
         access_token: Optional[str] = None,
+        token_cache_path: Optional[str] = None,
     ):
         if start_date > end_date:
             raise ValueError("start_date must be on or before end_date")
@@ -595,6 +596,9 @@ class KoreaInvestmentDailyPriceProvider(MarketDataProvider):
         self._start_date = start_date
         self._end_date = end_date
         self._access_token = access_token
+        self._token_cache_path = (
+            Path(token_cache_path).expanduser() if token_cache_path else None
+        )
 
     @property
     def metadata(self) -> ProviderMetadata:
@@ -637,6 +641,10 @@ class KoreaInvestmentDailyPriceProvider(MarketDataProvider):
     def _get_access_token(self) -> str:
         if self._access_token:
             return self._access_token
+        cached_token = self._read_cached_access_token()
+        if cached_token:
+            self._access_token = cached_token
+            return cached_token
         response = self._transport.post(
             "/oauth2/tokenP",
             {"content-type": "application/json"},
@@ -650,7 +658,46 @@ class KoreaInvestmentDailyPriceProvider(MarketDataProvider):
         if not token:
             raise RuntimeError("KIS OAuth response did not include access_token")
         self._access_token = token
+        self._write_cached_access_token(token, response.get("expires_in"))
         return token
+
+    def _read_cached_access_token(self) -> str:
+        if self._token_cache_path is None or not self._token_cache_path.exists():
+            return ""
+        try:
+            payload = json.loads(self._token_cache_path.read_text(encoding="utf-8"))
+            token = str(payload.get("access_token", "")).strip()
+            expires_at = datetime.fromisoformat(str(payload.get("expires_at", "")))
+        except (OSError, ValueError, TypeError, json.JSONDecodeError):
+            return ""
+        if token and expires_at > datetime.utcnow() + timedelta(minutes=1):
+            return token
+        return ""
+
+    def _write_cached_access_token(self, token: str, expires_in: object) -> None:
+        if self._token_cache_path is None:
+            return
+        try:
+            ttl_seconds = max(60, int(expires_in or 0))
+        except (TypeError, ValueError):
+            ttl_seconds = 86400
+        expires_at = datetime.utcnow() + timedelta(seconds=max(1, ttl_seconds - 60))
+        try:
+            self._token_cache_path.parent.mkdir(parents=True, exist_ok=True)
+            self._token_cache_path.write_text(
+                json.dumps(
+                    {
+                        "access_token": token,
+                        "expires_at": expires_at.isoformat(),
+                    },
+                    ensure_ascii=True,
+                    sort_keys=True,
+                ),
+                encoding="utf-8",
+            )
+            self._token_cache_path.chmod(0o600)
+        except OSError:
+            return
 
     def _normalize_row(self, symbol: str, row: Dict[str, object]) -> PriceBarInput:
         raw_date = _dict_value(row, ("stck_bsop_date", "STCK_BSOP_DATE"))
