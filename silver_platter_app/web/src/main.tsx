@@ -38,6 +38,38 @@ type PriceRange = {
   expected_pnl_upper_krw: number;
 };
 
+type HorizonProjection = {
+  horizon: string;
+  days: number;
+  expected_price: number;
+  expected_profit_krw: number;
+  expected_profit_pct: number;
+};
+
+type InvestmentProjection = {
+  side: string;
+  entry_price: number;
+  break_even_price: number;
+  target_profit_pct: number;
+  target_price: number;
+  expected_return_annualized_pct: number;
+  expected_profit_krw: number;
+  expected_profit_pct: number;
+  best_horizon: string;
+  estimated_days_to_break_even: number | null;
+  estimated_days_to_target_profit: number | null;
+  estimated_holding_days: number | null;
+  risk_score: number;
+  risk_level: string;
+  guidance: {
+    action: string;
+    level: string;
+    summary: string;
+    actions: string[];
+  };
+  horizon_projections: HorizonProjection[];
+};
+
 type RiskIssue = {
   code: string;
   severity: string;
@@ -52,6 +84,7 @@ type OrderPreviewResponse = {
   order_amount_krw: number;
   expected_slippage_krw: number;
   price_ranges: PriceRange[];
+  investment_projection: InvestmentProjection;
   risk_check: {
     status: string;
     issues: RiskIssue[];
@@ -471,6 +504,13 @@ function formatErrorPct(value: number): string {
   return `${formatNumber(value * 100, 2)}%`;
 }
 
+function formatDays(value: number | null | undefined): string {
+  if (value == null) {
+    return "Not reached";
+  }
+  return value === 1 ? "1 day" : `${value.toLocaleString("en-US")} days`;
+}
+
 function statusLabel(value: string | undefined): string {
   if (!value) {
     return "Unknown";
@@ -518,13 +558,21 @@ function backupStatusDetail(status: BackupStatusResponse): string {
 function statusTone(value: string | undefined): string {
   const normalized = (value ?? "").toLowerCase();
   if (
-    ["ok", "pass", "ready", "accepted", "filled", "stored", "skipped_existing_history"].includes(
-      normalized,
-    )
+    [
+      "ok",
+      "pass",
+      "ready",
+      "accepted",
+      "filled",
+      "stored",
+      "low",
+      "proceed",
+      "skipped_existing_history",
+    ].includes(normalized)
   ) {
     return "ok";
   }
-  if (["blocked", "failed", "critical", "rejected", "block"].includes(normalized)) {
+  if (["blocked", "failed", "critical", "rejected", "block", "avoid", "high"].includes(normalized)) {
     return "critical";
   }
   if (
@@ -533,10 +581,13 @@ function statusTone(value: string | undefined): string {
       "warning",
       "watch",
       "no_data",
+      "moderate",
+      "reduce",
       "skipped_disabled",
       "skipped_unconfigured",
       "skipped_provider_unconfigured",
       "skipped_unsupported_market",
+      "stage",
     ].includes(normalized)
   ) {
     return "watch";
@@ -641,6 +692,8 @@ function orderPayload(form: OrderForm) {
     quantity: toNumber(form.quantity, 0),
     avg_daily_turnover_20d_krw: 5_000_000_000,
     volatility_annualized: 0.3,
+    target_profit_pct: Math.max(0, toNumber(form.strategyMinReturnPct, 0.01)),
+    expected_return_annualized: 0.08,
     horizons: ["1d", "1w", "1m", "3m"],
     group_day_new_order_amount_krw: 600_000_000,
     group_avg_daily_turnover_20d_krw: 20_000_000_000,
@@ -1350,6 +1403,7 @@ function App() {
   };
 
   const priceRanges = preview?.price_ranges ?? [];
+  const investmentProjection = preview?.investment_projection ?? null;
   const latestPrediction = data.mlJob?.predictions.find((item) => item.horizon === "1w");
   const modelPerformance = data.mlPerformance?.error_summary;
   const mlIssue =
@@ -1649,6 +1703,27 @@ function App() {
 
               <PriceRiskChart chart={historyRiskChart} />
 
+              {historyRiskChart ? (
+                <div className="risk-point-list" role="table" aria-label="Recent risk points">
+                  <div className="risk-point-row head">
+                    <span>Time</span>
+                    <span>Close</span>
+                    <span>Risk</span>
+                    <span>Status</span>
+                  </div>
+                  {historyRiskChart.points.slice(-6).map((point) => (
+                    <div className="risk-point-row" key={point.bar_ts}>
+                      <span>{formatTimestamp(point.bar_ts)}</span>
+                      <strong>{formatNumber(point.close_price, 2)}</strong>
+                      <strong>{formatNumber(point.risk_score, 1)}</strong>
+                      <span className={statusTone(point.risk_status)}>
+                        {statusLabel(point.risk_status)}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              ) : null}
+
               <section className="risk-analysis">
                 <header>
                   <strong>Risk Summary</strong>
@@ -1871,6 +1946,58 @@ function App() {
             <span>Min Return</span>
             <strong>{formatPct(toNumber(form.strategyMinReturnPct, 0.01) * 100)}</strong>
           </div>
+
+          {investmentProjection ? (
+            <section className="investment-projection">
+              <header>
+                <div>
+                  <h2>Trade Outlook</h2>
+                  <span>
+                    {statusLabel(investmentProjection.risk_level)} risk |{" "}
+                    {formatNumber(investmentProjection.risk_score, 1)}
+                  </span>
+                </div>
+                <strong className={statusTone(investmentProjection.guidance.level)}>
+                  {statusLabel(investmentProjection.guidance.action)}
+                </strong>
+              </header>
+              <div className="projection-grid">
+                <span>Expected Profit</span>
+                <strong>{formatKrw(investmentProjection.expected_profit_krw)}</strong>
+                <span>Best Horizon</span>
+                <strong>{investmentProjection.best_horizon.toUpperCase()}</strong>
+                <span>Break Even</span>
+                <strong>
+                  {formatNumber(investmentProjection.break_even_price, 2)} |{" "}
+                  {formatDays(investmentProjection.estimated_days_to_break_even)}
+                </strong>
+                <span>Target</span>
+                <strong>
+                  {formatNumber(investmentProjection.target_price, 2)} |{" "}
+                  {formatDays(investmentProjection.estimated_days_to_target_profit)}
+                </strong>
+                <span>Holding</span>
+                <strong>{formatDays(investmentProjection.estimated_holding_days)}</strong>
+                <span>Return</span>
+                <strong>{formatPct(investmentProjection.expected_profit_pct)}</strong>
+              </div>
+              <p>{investmentProjection.guidance.summary}</p>
+              <div className="guidance-actions">
+                {investmentProjection.guidance.actions.map((action) => (
+                  <span key={action}>{action}</span>
+                ))}
+              </div>
+              <div className="projection-horizons" role="table" aria-label="Expected profit by horizon">
+                {investmentProjection.horizon_projections.map((projection) => (
+                  <div key={projection.horizon}>
+                    <span>{projection.horizon.toUpperCase()}</span>
+                    <strong>{formatKrw(projection.expected_profit_krw)}</strong>
+                    <em>{formatNumber(projection.expected_price, 2)}</em>
+                  </div>
+                ))}
+              </div>
+            </section>
+          ) : null}
 
           <div className="range-table" role="table" aria-label="Predicted price ranges">
             <div className="range-row range-head" role="row">

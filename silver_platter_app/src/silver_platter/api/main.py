@@ -110,6 +110,8 @@ class OrderPreviewRequest(BaseModel):
     horizons: List[str] = Field(default_factory=lambda: ["1d", "1w", "1m", "3m"])
     group_day_new_order_amount_krw: Optional[float] = None
     group_avg_daily_turnover_20d_krw: Optional[float] = None
+    target_profit_pct: float = 0.02
+    expected_return_annualized: float = 0.08
 
 
 class FeatureSnapshotRequest(BaseModel):
@@ -733,6 +735,8 @@ def order_preview(request: OrderPreviewRequest) -> Dict[str, Any]:
         horizons=request.horizons,
         group_day_new_order_amount_krw=request.group_day_new_order_amount_krw,
         group_avg_daily_turnover_20d_krw=request.group_avg_daily_turnover_20d_krw,
+        target_profit_pct=request.target_profit_pct,
+        expected_return_annualized=request.expected_return_annualized,
     )
     return create_order_preview(preview_input)
 

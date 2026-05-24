@@ -499,6 +499,38 @@ button:disabled {
   padding-top: 12px;
 }
 
+.risk-point-list {
+  border: 1px solid #dce3e8;
+  border-radius: 8px;
+  margin-top: 12px;
+  overflow: hidden;
+}
+
+.risk-point-row {
+  display: grid;
+  font-size: 12px;
+  grid-template-columns: minmax(132px, 1.2fr) repeat(3, minmax(72px, 1fr));
+  min-height: 34px;
+}
+
+.risk-point-row span,
+.risk-point-row strong {
+  align-items: center;
+  border-top: 1px solid #edf1f4;
+  display: flex;
+  padding: 0 10px;
+}
+
+.risk-point-row.head span {
+  background: #f0f4f6;
+  border-top: 0;
+  color: #59656e;
+}
+
+.risk-point-row strong {
+  font-size: 12px;
+}
+
 .risk-analysis p,
 .geo-event-row p {
   color: #33424c;
@@ -656,10 +688,15 @@ select {
 }
 
 .decision-band,
-.index-strip {
+.index-strip,
+.investment-projection {
   background: #f6f8f9;
   border: 1px solid #dce3e8;
   border-radius: 8px;
+}
+
+.decision-band,
+.index-strip {
   display: grid;
   gap: 8px 12px;
   grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
@@ -668,15 +705,91 @@ select {
 }
 
 .decision-band span,
-.index-strip span {
+.index-strip span,
+.projection-grid span {
   color: #59656e;
   font-size: 12px;
 }
 
 .decision-band strong,
-.index-strip strong {
+.index-strip strong,
+.projection-grid strong {
   font-size: 13px;
   min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.investment-projection {
+  display: grid;
+  gap: 12px;
+  margin-top: 12px;
+  padding: 12px;
+}
+
+.investment-projection header {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+}
+
+.investment-projection h2 {
+  font-size: 14px;
+  margin: 0;
+}
+
+.investment-projection header span,
+.investment-projection p,
+.guidance-actions span {
+  color: #59656e;
+  font-size: 12px;
+}
+
+.investment-projection p {
+  line-height: 1.5;
+  margin: 0;
+}
+
+.projection-grid {
+  display: grid;
+  gap: 8px 12px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.guidance-actions,
+.projection-horizons {
+  display: grid;
+  gap: 6px;
+}
+
+.guidance-actions span {
+  background: #ffffff;
+  border: 1px solid #dce3e8;
+  border-radius: 6px;
+  padding: 8px;
+}
+
+.projection-horizons {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.projection-horizons div {
+  background: #ffffff;
+  border: 1px solid #dce3e8;
+  border-radius: 6px;
+  display: grid;
+  gap: 4px;
+  padding: 8px;
+}
+
+.projection-horizons span,
+.projection-horizons em {
+  color: #59656e;
+  font-size: 12px;
+  font-style: normal;
+}
+
+.projection-horizons strong {
+  font-size: 13px;
   overflow-wrap: anywhere;
 }
 
@@ -837,7 +950,9 @@ select {
   }
 
   .history-risk-stats,
-  .evidence-grid {
+  .evidence-grid,
+  .projection-grid,
+  .projection-horizons {
     grid-template-columns: 1fr;
   }
 
@@ -865,6 +980,10 @@ select {
 
   .range-row {
     grid-template-columns: 0.8fr repeat(3, minmax(64px, 1fr));
+  }
+
+  .risk-point-row {
+    grid-template-columns: minmax(110px, 1.2fr) repeat(3, minmax(58px, 1fr));
   }
 
   .ops-row,

@@ -3,6 +3,7 @@ from math import sqrt
 from typing import Dict, Iterable, List, Optional
 
 from silver_platter.risk import MvpRiskLimits, OrderRiskInput, evaluate_order_risk
+from silver_platter.trade_projection import TradeProjectionInput, build_trade_projection
 
 
 DEFAULT_HORIZON_DAYS = {
@@ -29,6 +30,8 @@ class OrderPreviewInput:
     horizons: Iterable[str] = ("1d", "1w", "1m", "3m")
     group_day_new_order_amount_krw: Optional[float] = None
     group_avg_daily_turnover_20d_krw: Optional[float] = None
+    target_profit_pct: float = 0.02
+    expected_return_annualized: float = 0.08
 
 
 def _price_range(
@@ -48,6 +51,7 @@ def _price_range(
 def create_order_preview(
     preview_input: OrderPreviewInput, limits: MvpRiskLimits = MvpRiskLimits()
 ) -> Dict[str, object]:
+    horizons = list(preview_input.horizons)
     order_amount_krw = preview_input.current_price * preview_input.quantity
     order_amount_krw *= preview_input.fx_rate_krw
 
@@ -68,7 +72,7 @@ def create_order_preview(
     )
 
     ranges: List[Dict[str, object]] = []
-    for horizon in preview_input.horizons:
+    for horizon in horizons:
         horizon_days = DEFAULT_HORIZON_DAYS.get(horizon)
         if horizon_days is None:
             continue
@@ -94,6 +98,28 @@ def create_order_preview(
         )
         ranges.append(point)
 
+    investment_projection = build_trade_projection(
+        TradeProjectionInput(
+            side=preview_input.side,
+            entry_price=preview_input.current_price,
+            quantity=preview_input.quantity,
+            fx_rate_krw=preview_input.fx_rate_krw,
+            order_amount_krw=order_amount_krw,
+            expected_slippage_krw=expected_slippage_krw,
+            annualized_volatility=preview_input.volatility_annualized,
+            expected_return_annualized=preview_input.expected_return_annualized,
+            target_profit_pct=preview_input.target_profit_pct,
+            avg_daily_turnover_20d_krw=preview_input.avg_daily_turnover_20d_krw,
+        ),
+        risk_decision,
+        {
+            horizon: days
+            for horizon, days in DEFAULT_HORIZON_DAYS.items()
+            if horizon in set(horizons)
+        }
+        or {"1m": DEFAULT_HORIZON_DAYS["1m"]},
+    )
+
     return {
         "account_id": preview_input.account_id,
         "security_id": preview_input.security_id,
@@ -103,5 +129,6 @@ def create_order_preview(
         "order_amount_krw": round(order_amount_krw, 2),
         "expected_slippage_krw": round(expected_slippage_krw, 2),
         "price_ranges": ranges,
+        "investment_projection": investment_projection,
         "risk_check": risk_decision.as_dict(),
     }
