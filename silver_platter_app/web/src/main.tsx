@@ -452,7 +452,7 @@ const EMPTY_DASHBOARD: DashboardData = {
 async function apiGet<T>(path: string): Promise<T> {
   const response = await fetch(path);
   if (!response.ok) {
-    throw new Error(`${path} returned ${response.status}`);
+    throw new Error(`${path} 응답 오류 (${response.status})`);
   }
   return (await response.json()) as T;
 }
@@ -464,7 +464,7 @@ async function apiPost<T>(path: string, body: unknown): Promise<T> {
     body: JSON.stringify(body),
   });
   if (!response.ok) {
-    throw new Error(`${path} returned ${response.status}`);
+    throw new Error(`${path} 응답 오류 (${response.status})`);
   }
   return (await response.json()) as T;
 }
@@ -479,21 +479,21 @@ function formatKrw(value: number): string {
 }
 
 function formatNumber(value: number, digits = 1): string {
-  return value.toLocaleString("en-US", {
+  return value.toLocaleString("ko-KR", {
     maximumFractionDigits: digits,
     minimumFractionDigits: digits,
   });
 }
 
 function formatCompactNumber(value: number): string {
-  return new Intl.NumberFormat("en-US", {
+  return new Intl.NumberFormat("ko-KR", {
     maximumFractionDigits: 1,
     notation: "compact",
   }).format(value);
 }
 
 function formatMaybeNumber(value: number | null | undefined, digits = 0): string {
-  return value == null ? "Unknown" : formatNumber(value, digits);
+  return value == null ? "확인 불가" : formatNumber(value, digits);
 }
 
 function formatPct(value: number): string {
@@ -506,20 +506,57 @@ function formatErrorPct(value: number): string {
 
 function formatDays(value: number | null | undefined): string {
   if (value == null) {
-    return "Not reached";
+    return "도달 전";
   }
-  return value === 1 ? "1 day" : `${value.toLocaleString("en-US")} days`;
+  if (value === 0) {
+    return "즉시";
+  }
+  return `${value.toLocaleString("ko-KR")}일`;
 }
 
 function statusLabel(value: string | undefined): string {
   if (!value) {
-    return "Unknown";
+    return "확인 불가";
   }
-  return value.replace(/_/g, " ").toUpperCase();
+  const normalized = value.toLowerCase();
+  const labels: Record<string, string> = {
+    accepted: "접수",
+    avoid: "진입 보류",
+    block: "차단",
+    blocked: "차단",
+    critical: "위험",
+    degraded: "주의",
+    error: "오류",
+    failed: "실패",
+    filled: "체결",
+    high: "높음",
+    idle: "대기",
+    loading: "로딩 중",
+    low: "낮음",
+    moderate: "보통",
+    no_data: "데이터 없음",
+    ok: "정상",
+    pass: "통과",
+    proceed: "진행",
+    ready: "준비됨",
+    reduce: "축소",
+    rejected: "거절",
+    skipped_disabled: "비활성화로 건너뜀",
+    skipped_existing_history: "기존 이력 사용",
+    skipped_provider_unconfigured: "공급자 미설정",
+    skipped_unconfigured: "미설정",
+    skipped_unsupported_market: "미지원 시장",
+    stage: "분할 진입",
+    stored: "저장됨",
+    submitted: "제출됨",
+    warning: "경고",
+    watch: "관찰",
+  };
+  return labels[normalized] ?? value.replace(/_/g, " ");
 }
 
 function yesNo(value: boolean): string {
-  return value ? "yes" : "no";
+  return value ? "가능" : "불가";
 }
 
 function providerLicenseSummary(
@@ -530,26 +567,30 @@ function providerLicenseSummary(
     return fallback;
   }
   const policy = provider.license_policy;
-  return `${policy.license_name} store ${yesNo(policy.can_store)} transform ${yesNo(policy.can_transform)} realtime ${yesNo(policy.can_display_realtime)} redistribute ${yesNo(policy.can_redistribute)} priority ${provider.priority}`;
+  return `${policy.license_name} | 저장 ${yesNo(policy.can_store)} | 변환 ${yesNo(
+    policy.can_transform,
+  )} | 실시간 표시 ${yesNo(policy.can_display_realtime)} | 재배포 ${yesNo(
+    policy.can_redistribute,
+  )} | 우선순위 ${provider.priority}`;
 }
 
 function backupStatusDetail(status: BackupStatusResponse): string {
   const parts = status.latest_backup_date
     ? [
-        `backup ${status.backup_status}`,
-        `restore ${status.restore_status}`,
-        `drill ${status.restore_drill_status}`,
-        `date ${status.latest_backup_date}`,
+        `백업 ${statusLabel(status.backup_status)}`,
+        `복구 ${statusLabel(status.restore_status)}`,
+        `훈련 ${statusLabel(status.restore_drill_status)}`,
+        `기준일 ${status.latest_backup_date}`,
       ]
-    : ["no backup manifest", `drill ${status.restore_drill_status}`];
+    : ["백업 매니페스트 없음", `훈련 ${statusLabel(status.restore_drill_status)}`];
   if (status.restore_drill_checked_at) {
-    parts.push(`drill checked ${status.restore_drill_checked_at}`);
+    parts.push(`훈련 점검 ${status.restore_drill_checked_at}`);
   }
   if (status.lock_held) {
-    parts.push("lock held");
+    parts.push("잠금 유지 중");
   }
   if (status.issue_count) {
-    parts.push(`${status.issue_count} issue${status.issue_count === 1 ? "" : "s"}`);
+    parts.push(`이슈 ${status.issue_count}건`);
     parts.push(status.issues.slice(0, 2).join("; "));
   }
   return parts.filter(Boolean).join(" | ");
@@ -596,12 +637,151 @@ function statusTone(value: string | undefined): string {
 }
 
 function rangeLabel(value: HistoryRiskRange): string {
-  return value.toUpperCase();
+  const labels: Record<HistoryRiskRange, string> = {
+    "1w": "1주",
+    "1d": "1일",
+    "1h": "1시간",
+    "5m": "5분",
+  };
+  return labels[value];
+}
+
+function horizonLabel(value: string): string {
+  const labels: Record<string, string> = {
+    "1d": "1일",
+    "1w": "1주",
+    "1m": "1개월",
+    "3m": "3개월",
+  };
+  return labels[value.toLowerCase()] ?? value.toUpperCase();
+}
+
+function sideLabel(value: string): string {
+  const labels: Record<string, string> = {
+    buy: "매수",
+    sell: "매도",
+  };
+  return labels[value.toLowerCase()] ?? statusLabel(value);
+}
+
+function orderTypeLabel(value: string): string {
+  const labels: Record<string, string> = {
+    limit: "지정가",
+    market: "시장가",
+  };
+  return labels[value.toLowerCase()] ?? statusLabel(value);
+}
+
+function marketLabel(value: string): string {
+  const labels: Record<string, string> = {
+    KR: "국내",
+    US: "미국",
+  };
+  return labels[value.toUpperCase()] ?? value;
+}
+
+function strategyLabel(plugin: Pick<StrategyPlugin, "plugin_id" | "name"> | null | undefined): string {
+  if (!plugin) {
+    return "전략 확인 불가";
+  }
+  const labels: Record<string, string> = {
+    "fixed-close": "고정 종가 리플레이",
+    "momentum-threshold": "모멘텀 기준 전략",
+  };
+  return labels[plugin.plugin_id] ?? plugin.name;
+}
+
+function componentLabel(value: string): string {
+  const labels: Record<string, string> = {
+    api: "API",
+    backup_restore: "백업/복구",
+    goldilocks: "Goldilocks",
+    order_state: "주문 상태",
+  };
+  return labels[value] ?? value.replace(/_/g, " ");
+}
+
+function groupLabel(value: string): string {
+  const labels: Record<string, string> = {
+    "Cloud AI": "클라우드 AI",
+    "EV Battery": "전기차 배터리",
+    Semiconductor: "반도체",
+  };
+  return labels[value] ?? value;
+}
+
+function providerLabel(value: string): string {
+  const labels: Record<string, string> = {
+    ecb: "ECB",
+    federal_reserve: "연준",
+    headline: "뉴스",
+  };
+  return labels[value] ?? value;
+}
+
+function providerComponentLabel(value: string): string {
+  const stripped = value.replace(/^provider:/, "");
+  const [providerCode, providerType] = stripped.split(":");
+  const providerLabels: Record<string, string> = {
+    csv_fx: "CSV 환율",
+    ecos_bok: "ECOS 한국은행",
+    kis_domestic_daily_price: "KIS 국내 일봉",
+    krx_data: "KRX 데이터",
+    krx_kind: "KRX KIND",
+    opendart: "OpenDART",
+    sec_edgar: "SEC EDGAR",
+  };
+  const typeLabels: Record<string, string> = {
+    disclosure: "공시",
+    fx: "환율",
+    macro: "거시",
+    price: "가격",
+    reference: "종목",
+  };
+  const providerName = providerLabels[providerCode] ?? providerCode;
+  return providerType ? `${providerName} (${typeLabels[providerType] ?? providerType})` : providerName;
+}
+
+function riskTagLabel(value: string): string {
+  const labels: Record<string, string> = {
+    geopolitical: "국제 정세",
+    sanction: "제재",
+  };
+  return labels[value] ?? value;
+}
+
+function operationDetailLabel(value: string): string {
+  const labels: Record<string, string> = {
+    "health route responsive": "헬스 체크 응답 정상",
+    "paper submission enabled": "모의 주문 제출 활성화",
+  };
+  return labels[value] ?? value;
+}
+
+function marketDetailLabel(value: string): string {
+  const labels: Record<string, string> = {
+    "KIS query credentials are not configured": "KIS 조회용 인증 정보가 설정되지 않았습니다",
+  };
+  return labels[value] ?? value;
+}
+
+function auditActionLabel(value: string): string {
+  const labels: Record<string, string> = {
+    ORDER_SUBMIT: "주문 제출",
+  };
+  return labels[value] ?? value.replace(/_/g, " ");
+}
+
+function targetTypeLabel(value: string): string {
+  const labels: Record<string, string> = {
+    order: "주문",
+  };
+  return labels[value] ?? value;
 }
 
 function formatTimestamp(value: string | null | undefined): string {
   if (!value) {
-    return "Unknown";
+    return "확인 불가";
   }
   return new Date(value).toLocaleString("ko-KR", {
     month: "2-digit",
@@ -613,21 +793,21 @@ function formatTimestamp(value: string | null | undefined): string {
 
 function historyPrefetchLabel(result: HistoryPrefetchResult | null, state: RequestState): string {
   if (state === "loading") {
-    return "History loading";
+    return "과거 데이터 수집 중";
   }
   if (state === "error") {
-    return "History failed";
+    return "과거 데이터 수집 실패";
   }
   if (!result) {
-    return "History idle";
+    return "과거 데이터 대기";
   }
   if (result.status === "stored") {
-    return `History stored ${result.bar_count.toLocaleString("en-US")} bars`;
+    return `과거 데이터 ${result.bar_count.toLocaleString("ko-KR")}개 저장`;
   }
   if (result.status === "skipped_existing_history") {
-    return `History ready ${result.existing_bar_count.toLocaleString("en-US")} bars`;
+    return `기존 과거 데이터 ${result.existing_bar_count.toLocaleString("ko-KR")}개 사용`;
   }
-  return `History ${statusLabel(result.status)}`;
+  return `과거 데이터 ${statusLabel(result.status)}`;
 }
 
 function loadRecentPreviewSecurities(): RecentPreviewSecurity[] {
@@ -894,7 +1074,7 @@ async function loadDashboardData(form: OrderForm): Promise<DashboardData> {
     headlines: [
       {
         provider: "federal_reserve",
-        title: "Sanction shock affects chip exports",
+        title: "제재 충격이 반도체 수출에 영향",
         published_at: asOf,
         url: "https://www.federalreserve.gov/feeds/press_all.xml",
         security_ids: [securityId],
@@ -903,7 +1083,7 @@ async function loadDashboardData(form: OrderForm): Promise<DashboardData> {
       },
       {
         provider: "ecb",
-        title: "Sanction shock affects chip exports",
+        title: "제재 충격이 반도체 수출에 영향",
         published_at: asOf,
         url: "https://www.ecb.europa.eu/rss/press.html",
         group_ids: ["Semiconductor"],
@@ -1061,7 +1241,7 @@ function PriceRiskChart({
   chart: PriceHistoryRiskChartResponse | null;
 }) {
   if (!chart || !chart.points.length) {
-    return <div className="empty-row">No stored history selected</div>;
+    return <div className="empty-row">저장된 과거 데이터가 선택되지 않았습니다</div>;
   }
 
   const width = 720;
@@ -1105,7 +1285,7 @@ function PriceRiskChart({
   const latestIndex = chart.points.length - 1;
 
   return (
-    <svg className="risk-svg" role="img" aria-label="Price risk chart" viewBox={`0 0 ${width} ${height}`}>
+    <svg className="risk-svg" role="img" aria-label="가격 리스크 차트" viewBox={`0 0 ${width} ${height}`}>
       <rect x="0" y="0" width={width} height={height} rx="8" />
       <line x1={left} y1={priceBottom} x2={width - right} y2={priceBottom} className="axis-line" />
       <line x1={left} y1={volumeBottom} x2={width - right} y2={volumeBottom} className="axis-line" />
@@ -1170,7 +1350,7 @@ function GeopoliticalRiskChart({
   events: GeoRiskEvent[];
 }) {
   if (!chart || !chart.points.length) {
-    return <div className="empty-row">No stored history selected</div>;
+    return <div className="empty-row">저장된 과거 데이터가 선택되지 않았습니다</div>;
   }
 
   const width = 720;
@@ -1192,7 +1372,7 @@ function GeopoliticalRiskChart({
   }));
 
   return (
-    <svg className="risk-svg geo" role="img" aria-label="Geopolitical risk chart" viewBox={`0 0 ${width} ${height}`}>
+    <svg className="risk-svg geo" role="img" aria-label="국제 정세 리스크 차트" viewBox={`0 0 ${width} ${height}`}>
       <rect x="0" y="0" width={width} height={height} rx="8" />
       <line x1={left} y1={bottom} x2={width - right} y2={bottom} className="axis-line" />
       <line x1={left} y1={scaleValue(70, 0, 100, bottom, top)} x2={width - right} y2={scaleValue(70, 0, 100, bottom, top)} className="risk-threshold" />
@@ -1208,7 +1388,7 @@ function GeopoliticalRiskChart({
         );
       })}
       <text className="axis-label" x={left} y={16}>
-        Risk 100
+        리스크 100
       </text>
       <text className="axis-label" x={left} y={height - 12}>
         {formatTimestamp(chart.points[0]?.bar_ts)}
@@ -1259,7 +1439,7 @@ function App() {
       setState("ready");
     } catch (exc) {
       setState("error");
-      setError(exc instanceof Error ? exc.message : "dashboard refresh failed");
+      setError(exc instanceof Error ? exc.message : "대시보드 새로고침 실패");
     }
   }, [form]);
 
@@ -1359,7 +1539,7 @@ function App() {
       setActionState("ready");
     } catch (exc) {
       setActionState("error");
-      setError(exc instanceof Error ? exc.message : "order submission failed");
+      setError(exc instanceof Error ? exc.message : "주문 제출 실패");
     }
   };
 
@@ -1381,7 +1561,7 @@ function App() {
       setHistoryState("ready");
     } catch (exc) {
       setHistoryState("error");
-      setError(exc instanceof Error ? exc.message : "history prefetch failed");
+      setError(exc instanceof Error ? exc.message : "과거 데이터 사전 수집 실패");
     }
   };
 
@@ -1408,10 +1588,10 @@ function App() {
   const modelPerformance = data.mlPerformance?.error_summary;
   const mlIssue =
     data.mlJob && data.mlJob.predictions.length === 0
-      ? "No predictions returned"
+      ? "예측 결과 없음"
       : data.mlJob
         ? ""
-        : "Awaiting forecast";
+        : "예측 대기 중";
   const latestIndex = data.indexChart?.points.at(-1);
   const selectedStrategy =
     data.strategyPlugins.find((plugin) => plugin.plugin_id === form.strategyPluginId) ?? null;
@@ -1466,12 +1646,12 @@ function App() {
       <header className="topbar">
         <div>
           <strong>Silver Platter</strong>
-          <span>{state === "loading" ? "Refreshing" : "Simulation"}</span>
+          <span>{state === "loading" ? "새로고침 중" : "모의 운용"}</span>
         </div>
         <button
           type="button"
           className="icon-button"
-          title="Refresh dashboard"
+          title="대시보드 새로고침"
           onClick={() => refresh()}
           disabled={state === "loading"}
         >
@@ -1486,18 +1666,18 @@ function App() {
         </section>
       ) : null}
 
-      <section className="top-insights" aria-label="Market shortcuts">
+      <section className="top-insights" aria-label="시장 바로가기">
         <article className="volume-leader-panel">
           <header>
             <div>
-              <h2>Volume Top 20</h2>
+              <h2>거래량 상위 20</h2>
               <span>
                 {data.volumeLeaders
                   ? new Date(data.volumeLeaders.generated_at).toLocaleTimeString("ko-KR", {
                       hour: "2-digit",
                       minute: "2-digit",
                     })
-                  : "Loading"}
+                  : "불러오는 중"}
               </span>
             </div>
             <BarChart3 size={18} />
@@ -1506,7 +1686,7 @@ function App() {
             {volumeMarkets.map((market) => (
               <section className="volume-market" key={market.market}>
                 <header>
-                  <strong>{market.market}</strong>
+                  <strong>{marketLabel(market.market)}</strong>
                   <span>{statusLabel(market.status)}</span>
                 </header>
                 <div className="volume-list">
@@ -1519,7 +1699,7 @@ function App() {
                         onClick={() =>
                           applySecurityToPreview(item.symbol, market.market, item.last_price)
                         }
-                        title={`Set ${item.symbol} in Order Preview`}
+                        title={`${item.symbol}을 주문 미리보기에 설정`}
                       >
                         <span>{item.rank}</span>
                         <strong>{item.symbol}</strong>
@@ -1528,7 +1708,7 @@ function App() {
                       </button>
                     ))
                   ) : (
-                    <p>{market.detail || statusLabel(market.status)}</p>
+                    <p>{market.detail ? marketDetailLabel(market.detail) : statusLabel(market.status)}</p>
                   )}
                 </div>
               </section>
@@ -1538,7 +1718,7 @@ function App() {
 
         <article className="recent-security-panel">
           <header>
-            <h2>Recent Preview</h2>
+            <h2>최근 조회 종목</h2>
             <span>{recentPreviewSecurities.length}/20</span>
           </header>
           <div className="recent-security-list">
@@ -1549,41 +1729,41 @@ function App() {
                   key={`${item.market}-${item.securityId}`}
                   className="recent-security-button"
                   onClick={() => applySecurityToPreview(item.securityId, item.market, item.price)}
-                  title={`Set ${item.securityId} in Order Preview`}
+                  title={`${item.securityId}을 주문 미리보기에 설정`}
                 >
                   <strong>{item.securityId}</strong>
-                  <span>{item.market}</span>
+                  <span>{marketLabel(item.market)}</span>
                   {item.price ? <em>{formatNumber(item.price, 2)}</em> : null}
                 </button>
               ))
             ) : (
-              <p>No previews yet</p>
+              <p>최근 조회한 종목이 없습니다</p>
             )}
           </div>
         </article>
       </section>
 
-      <nav className="app-tabs" aria-label="Dashboard views">
+      <nav className="app-tabs" aria-label="대시보드 화면">
         <button
           type="button"
           className={activeTab === "dashboard" ? "active" : ""}
           onClick={() => setActiveTab("dashboard")}
         >
-          Dashboard
+          대시보드
         </button>
         <button
           type="button"
           className={activeTab === "history-risk" ? "active" : ""}
           onClick={() => setActiveTab("history-risk")}
         >
-          History Risk
+          과거 리스크
         </button>
       </nav>
 
-      <section className="metric-grid" aria-label="Status metrics">
+      <section className="metric-grid" aria-label="상태 지표">
         <article className={`metric-card ${statusTone(riskStatus)}`}>
           <ShieldCheck size={18} />
-          <span>Risk Gate</span>
+          <span>리스크 게이트</span>
           <strong>{statusLabel(riskStatus)}</strong>
         </article>
         <article className={`metric-card ${statusTone(healthStatus)}`}>
@@ -1593,29 +1773,29 @@ function App() {
         </article>
         <article className={`metric-card ${statusTone(gateStatus)}`}>
           <Activity size={18} />
-          <span>Verification</span>
+          <span>검증</span>
           <strong>
-            {data.gate ? `${data.gate.passed_count}/${data.gate.total_count}` : "Unknown"}
+            {data.gate ? `${data.gate.passed_count}/${data.gate.total_count}` : "확인 불가"}
           </strong>
         </article>
         <article className="metric-card neutral">
           <ReceiptText size={18} />
-          <span>Tax Estimate</span>
-          <strong>{data.tax ? formatKrw(data.tax.estimated_tax_krw) : "Unknown"}</strong>
+          <span>세금 추정</span>
+          <strong>{data.tax ? formatKrw(data.tax.estimated_tax_krw) : "확인 불가"}</strong>
         </article>
         <article className={`metric-card ${statusTone(data.backtest?.status)}`}>
           <TestTube2 size={18} />
-          <span>Backtest</span>
-          <strong>{data.backtest ? statusLabel(data.backtest.status) : "Unknown"}</strong>
+          <span>백테스트</span>
+          <strong>{data.backtest ? statusLabel(data.backtest.status) : "확인 불가"}</strong>
         </article>
         <article className={`metric-card ${statusTone(headlineRiskStatus)}`}>
           <AlertTriangle size={18} />
-          <span>Headline Risk</span>
-          <strong>{headlineSignal ? statusLabel(headlineSignal.severity) : "Unknown"}</strong>
+          <span>뉴스 리스크</span>
+          <strong>{headlineSignal ? statusLabel(headlineSignal.severity) : "확인 불가"}</strong>
         </article>
         <article className={`metric-card ${statusTone(operationsStatus)}`}>
           <ServerCog size={18} />
-          <span>Operations</span>
+          <span>운영 상태</span>
           <strong>{statusLabel(operationsStatus)}</strong>
         </article>
       </section>
@@ -1624,7 +1804,7 @@ function App() {
         <section className="history-risk-workspace">
           <aside className="history-selector-panel">
             <header>
-              <h2>DB History</h2>
+              <h2>DB 과거 데이터</h2>
               <span>{historySecurities.length}</span>
             </header>
             <div className="history-security-list">
@@ -1642,18 +1822,18 @@ function App() {
                     onClick={() => selectHistorySecurity(security)}
                   >
                     <strong>{security.security_id}</strong>
-                    <span>{security.market}</span>
+                    <span>{marketLabel(security.market)}</span>
                     <em>{security.security_name}</em>
                     <small>
                       {security.latest_close_price
                         ? `${formatNumber(security.latest_close_price, 2)} | `
                         : ""}
-                      {security.bar_count.toLocaleString("en-US")} bars
+                      {security.bar_count.toLocaleString("ko-KR")}개
                     </small>
                   </button>
                 ))
               ) : (
-                <p>No stored DB history</p>
+                <p>저장된 DB 과거 데이터가 없습니다</p>
               )}
             </div>
           </aside>
@@ -1662,14 +1842,14 @@ function App() {
             <article className="risk-chart-card">
               <header>
                 <div>
-                  <h2>Price Risk</h2>
+                  <h2>가격 리스크</h2>
                   <span>
                     {selectedHistorySecurity
-                      ? `${selectedHistorySecurity.market}/${selectedHistorySecurity.security_id}`
-                      : "No selection"}
+                      ? `${marketLabel(selectedHistorySecurity.market)}/${selectedHistorySecurity.security_id}`
+                      : "선택 없음"}
                   </span>
                 </div>
-                <div className="range-toggle" role="group" aria-label="Risk range">
+                <div className="range-toggle" role="group" aria-label="리스크 범위">
                   {HISTORY_RISK_RANGES.map((range) => (
                     <button
                       type="button"
@@ -1684,11 +1864,11 @@ function App() {
               </header>
 
               <div className="history-risk-stats">
-                <span>Current</span>
+                <span>현재가</span>
                 <strong>{formatMaybeNumber(historyRiskChart?.current_price, 2)}</strong>
-                <span>Volume</span>
+                <span>거래량</span>
                 <strong>{formatMaybeNumber(historyRiskChart?.current_volume, 0)}</strong>
-                <span>Risk</span>
+                <span>리스크</span>
                 <strong className={statusTone(latestHistoryRisk?.risk_status)}>
                   {latestHistoryRisk
                     ? `${statusLabel(latestHistoryRisk.risk_status)} ${formatNumber(
@@ -1697,19 +1877,19 @@ function App() {
                       )}`
                     : statusLabel(historyRiskState)}
                 </strong>
-                <span>Latest</span>
+                <span>최근 시점</span>
                 <strong>{formatTimestamp(historyRiskChart?.latest_bar_ts)}</strong>
               </div>
 
               <PriceRiskChart chart={historyRiskChart} />
 
               {historyRiskChart ? (
-                <div className="risk-point-list" role="table" aria-label="Recent risk points">
+                <div className="risk-point-list" role="table" aria-label="최근 리스크 포인트">
                   <div className="risk-point-row head">
-                    <span>Time</span>
-                    <span>Close</span>
-                    <span>Risk</span>
-                    <span>Status</span>
+                    <span>시각</span>
+                    <span>종가</span>
+                    <span>리스크</span>
+                    <span>상태</span>
                   </div>
                   {historyRiskChart.points.slice(-6).map((point) => (
                     <div className="risk-point-row" key={point.bar_ts}>
@@ -1726,22 +1906,22 @@ function App() {
 
               <section className="risk-analysis">
                 <header>
-                  <strong>Risk Summary</strong>
+                  <strong>리스크 요약</strong>
                   <span>{statusLabel(historyRiskState)}</span>
                 </header>
-                <p>{historyRiskChart?.summary ?? "Stored history risk is not loaded."}</p>
+                <p>{historyRiskChart?.summary ?? "저장된 과거 리스크 분석을 불러오지 못했습니다."}</p>
                 <div className="evidence-grid">
                   <div>
-                    <strong>Evidence</strong>
+                    <strong>근거</strong>
                     <ul>
-                      {(historyRiskChart?.evidence ?? ["No evidence loaded."]).map((item) => (
+                      {(historyRiskChart?.evidence ?? ["불러온 근거가 없습니다."]).map((item) => (
                         <li key={item}>{item}</li>
                       ))}
                     </ul>
                   </div>
                   <div>
-                    <strong>Reasoning</strong>
-                    <p>{historyRiskChart?.reasoning ?? "No reasoning loaded."}</p>
+                    <strong>판단 이유</strong>
+                    <p>{historyRiskChart?.reasoning ?? "불러온 판단 이유가 없습니다."}</p>
                   </div>
                 </div>
               </section>
@@ -1750,8 +1930,8 @@ function App() {
             <article className="risk-chart-card">
               <header>
                 <div>
-                  <h2>Geopolitical Risk</h2>
-                  <span>{rangeLabel(historyRiskRange)} aligned</span>
+                  <h2>국제 정세 리스크</h2>
+                  <span>{rangeLabel(historyRiskRange)} 기준</span>
                 </div>
                 <AlertTriangle size={18} />
               </header>
@@ -1760,7 +1940,7 @@ function App() {
 
               <section className="geo-event-panel">
                 <header>
-                  <strong>Event Details</strong>
+                  <strong>이벤트 상세</strong>
                   <span>{geoRiskEvents.length}</span>
                 </header>
                 <div className="geo-event-list">
@@ -1770,18 +1950,18 @@ function App() {
                         <div>
                           <strong>{event.title}</strong>
                           <span>
-                            {event.provider} | {formatTimestamp(event.observedAt)} |{" "}
+                            {providerLabel(event.provider)} | {formatTimestamp(event.observedAt)} |{" "}
                             {statusLabel(event.severity)}
                           </span>
                         </div>
                         <p>
-                          {event.providerCount} providers and {event.headlineCount} headlines
-                          matched {event.eventTags.join(", ")} risk themes.
+                          {event.providerCount}개 공급자와 {event.headlineCount}개 헤드라인이{" "}
+                          {event.eventTags.map(riskTagLabel).join(", ")} 리스크 주제와 일치했습니다.
                         </p>
                       </article>
                     ))
                   ) : (
-                    <p>No geopolitical events in the selected range</p>
+                    <p>선택한 범위에 국제 정세 이벤트가 없습니다</p>
                   )}
                 </div>
               </section>
@@ -1792,12 +1972,12 @@ function App() {
       <section className="workbench">
         <article className="order-ticket">
           <header>
-            <h1>Order Preview</h1>
+            <h1>주문 미리보기</h1>
             <span>{form.securityId}</span>
           </header>
           <div className="ticket-grid">
             <label>
-              Security
+              종목
               <div className="inline-input-action">
                 <input
                   value={form.securityId}
@@ -1810,8 +1990,8 @@ function App() {
                 <button
                   type="button"
                   className="icon-button inline-icon-button"
-                  title="Prepare history"
-                  aria-label="Prepare history"
+                  title="과거 데이터 준비"
+                  aria-label="과거 데이터 준비"
                   onClick={prepareSecurityHistory}
                   disabled={historyState === "loading"}
                 >
@@ -1820,17 +2000,17 @@ function App() {
               </div>
             </label>
             <label>
-              Side
+              매매 구분
               <select
                 value={form.side}
                 onChange={(event) => setForm((current) => ({ ...current, side: event.target.value }))}
               >
-                <option value="buy">Buy</option>
-                <option value="sell">Sell</option>
+                <option value="buy">매수</option>
+                <option value="sell">매도</option>
               </select>
             </label>
             <label>
-              Price
+              가격
               <input
                 value={form.price}
                 inputMode="decimal"
@@ -1838,7 +2018,7 @@ function App() {
               />
             </label>
             <label>
-              Quantity
+              수량
               <input
                 value={form.quantity}
                 inputMode="numeric"
@@ -1848,19 +2028,19 @@ function App() {
               />
             </label>
             <label>
-              Type
+              주문 유형
               <select
                 value={form.orderType}
                 onChange={(event) =>
                   setForm((current) => ({ ...current, orderType: event.target.value }))
                 }
               >
-                <option value="limit">Limit</option>
-                <option value="market">Market</option>
+                <option value="limit">지정가</option>
+                <option value="market">시장가</option>
               </select>
             </label>
             <label>
-              Market
+              시장
               <select
                 value={form.market}
                 onChange={(event) => {
@@ -1869,12 +2049,12 @@ function App() {
                   setForm((current) => ({ ...current, market: event.target.value }));
                 }}
               >
-                <option value="KR">KR</option>
-                <option value="US">US</option>
+                <option value="KR">국내</option>
+                <option value="US">미국</option>
               </select>
             </label>
             <label>
-              Strategy
+              전략
               <select
                 value={form.strategyPluginId}
                 onChange={(event) =>
@@ -1884,14 +2064,14 @@ function App() {
                 {(data.strategyPlugins.length ? data.strategyPlugins : [{ plugin_id: "fixed-close", name: "Fixed close replay", description: "" }]).map(
                   (plugin) => (
                     <option value={plugin.plugin_id} key={plugin.plugin_id}>
-                      {plugin.name}
+                      {strategyLabel(plugin)}
                     </option>
                   ),
                 )}
               </select>
             </label>
             <label>
-              Min Return
+              최소 수익률
               <input
                 value={form.strategyMinReturnPct}
                 inputMode="decimal"
@@ -1910,7 +2090,7 @@ function App() {
               disabled={state === "loading"}
             >
               <Play size={16} />
-              Preview
+              미리보기
             </button>
             <button
               type="button"
@@ -1919,7 +2099,7 @@ function App() {
               disabled={actionState === "loading"}
             >
               <Send size={16} />
-              Paper Submit
+              모의 제출
             </button>
           </div>
 
@@ -1935,15 +2115,17 @@ function App() {
           ) : null}
 
           <div className="decision-band">
-            <span>Amount</span>
-            <strong>{preview ? formatKrw(preview.order_amount_krw) : "Unknown"}</strong>
-            <span>Slippage</span>
-            <strong>{preview ? formatKrw(preview.expected_slippage_krw) : "Unknown"}</strong>
-            <span>Order State</span>
-            <strong>{submission ? statusLabel(submission.state.status) : "Not submitted"}</strong>
-            <span>Strategy</span>
-            <strong>{selectedStrategy?.name ?? statusLabel(data.backtest?.strategy_plugin_id)}</strong>
-            <span>Min Return</span>
+            <span>주문 금액</span>
+            <strong>{preview ? formatKrw(preview.order_amount_krw) : "확인 불가"}</strong>
+            <span>슬리피지</span>
+            <strong>{preview ? formatKrw(preview.expected_slippage_krw) : "확인 불가"}</strong>
+            <span>주문 상태</span>
+            <strong>{submission ? statusLabel(submission.state.status) : "미제출"}</strong>
+            <span>주문 유형</span>
+            <strong>{orderTypeLabel(form.orderType)}</strong>
+            <span>전략</span>
+            <strong>{selectedStrategy ? strategyLabel(selectedStrategy) : statusLabel(data.backtest?.strategy_plugin_id)}</strong>
+            <span>최소 수익률</span>
             <strong>{formatPct(toNumber(form.strategyMinReturnPct, 0.01) * 100)}</strong>
           </div>
 
@@ -1951,9 +2133,9 @@ function App() {
             <section className="investment-projection">
               <header>
                 <div>
-                  <h2>Trade Outlook</h2>
+                  <h2>거래 전망</h2>
                   <span>
-                    {statusLabel(investmentProjection.risk_level)} risk |{" "}
+                    리스크 {statusLabel(investmentProjection.risk_level)} |{" "}
                     {formatNumber(investmentProjection.risk_score, 1)}
                   </span>
                 </div>
@@ -1962,23 +2144,23 @@ function App() {
                 </strong>
               </header>
               <div className="projection-grid">
-                <span>Expected Profit</span>
+                <span>예상 손익</span>
                 <strong>{formatKrw(investmentProjection.expected_profit_krw)}</strong>
-                <span>Best Horizon</span>
-                <strong>{investmentProjection.best_horizon.toUpperCase()}</strong>
-                <span>Break Even</span>
+                <span>최적 기간</span>
+                <strong>{horizonLabel(investmentProjection.best_horizon)}</strong>
+                <span>손익분기</span>
                 <strong>
                   {formatNumber(investmentProjection.break_even_price, 2)} |{" "}
                   {formatDays(investmentProjection.estimated_days_to_break_even)}
                 </strong>
-                <span>Target</span>
+                <span>목표가</span>
                 <strong>
                   {formatNumber(investmentProjection.target_price, 2)} |{" "}
                   {formatDays(investmentProjection.estimated_days_to_target_profit)}
                 </strong>
-                <span>Holding</span>
+                <span>예상 보유</span>
                 <strong>{formatDays(investmentProjection.estimated_holding_days)}</strong>
-                <span>Return</span>
+                <span>수익률</span>
                 <strong>{formatPct(investmentProjection.expected_profit_pct)}</strong>
               </div>
               <p>{investmentProjection.guidance.summary}</p>
@@ -1987,10 +2169,10 @@ function App() {
                   <span key={action}>{action}</span>
                 ))}
               </div>
-              <div className="projection-horizons" role="table" aria-label="Expected profit by horizon">
+              <div className="projection-horizons" role="table" aria-label="기간별 예상 손익">
                 {investmentProjection.horizon_projections.map((projection) => (
                   <div key={projection.horizon}>
-                    <span>{projection.horizon.toUpperCase()}</span>
+                    <span>{horizonLabel(projection.horizon)}</span>
                     <strong>{formatKrw(projection.expected_profit_krw)}</strong>
                     <em>{formatNumber(projection.expected_price, 2)}</em>
                   </div>
@@ -1999,16 +2181,16 @@ function App() {
             </section>
           ) : null}
 
-          <div className="range-table" role="table" aria-label="Predicted price ranges">
+          <div className="range-table" role="table" aria-label="예측 가격 범위">
             <div className="range-row range-head" role="row">
-              <span>Horizon</span>
-              <span>Low</span>
-              <span>Mid</span>
-              <span>High</span>
+              <span>기간</span>
+              <span>하단</span>
+              <span>중앙</span>
+              <span>상단</span>
             </div>
             {priceRanges.map((range) => (
               <div className="range-row" role="row" key={range.horizon}>
-                <span>{range.horizon.toUpperCase()}</span>
+                <span>{horizonLabel(range.horizon)}</span>
                 <span>{formatNumber(range.lower, 0)}</span>
                 <span>{formatNumber(range.median, 0)}</span>
                 <span>{formatNumber(range.upper, 0)}</span>
@@ -2019,13 +2201,13 @@ function App() {
 
         <article className="chart-panel">
           <header>
-            <h2>Group Volatility</h2>
+            <h2>그룹 변동성</h2>
             <BarChart3 size={18} />
           </header>
           <div className="bar-list">
             {groupRows.map((group) => (
               <div className="bar-row" key={group.name}>
-                <span>{group.name}</span>
+                <span>{groupLabel(group.name)}</span>
                 <div className="bar-track">
                   <div
                     className={`bar-fill ${group.risk}`}
@@ -2040,65 +2222,65 @@ function App() {
 
         <article className="chart-panel">
           <header>
-            <h2>ML Forecast</h2>
+            <h2>ML 예측</h2>
             <LineChart size={18} />
           </header>
           <dl className="forecast-list">
             <div>
-              <dt>Price</dt>
+              <dt>가격</dt>
               <dd>
                 {latestPrediction
                   ? `${formatNumber(latestPrediction.interval.price_lower, 0)} - ${formatNumber(
                       latestPrediction.interval.price_upper,
                       0,
                     )}`
-                  : "Unknown"}
+                  : "확인 불가"}
               </dd>
             </div>
             <div>
-              <dt>Volume</dt>
+              <dt>거래량</dt>
               <dd>
                 {latestPrediction
                   ? `${formatNumber(latestPrediction.interval.volume_lower / 1_000_000, 1)}M - ${formatNumber(
                       latestPrediction.interval.volume_upper / 1_000_000,
                       1,
                     )}M`
-                  : "Unknown"}
+                  : "확인 불가"}
               </dd>
             </div>
             <div>
-              <dt>Volatility</dt>
+              <dt>변동성</dt>
               <dd>
-                {latestPrediction ? `${formatNumber(latestPrediction.interval.volatility_mid * 100, 1)}%` : "Unknown"}
+                {latestPrediction ? `${formatNumber(latestPrediction.interval.volatility_mid * 100, 1)}%` : "확인 불가"}
               </dd>
             </div>
             <div>
-              <dt>Risk</dt>
-              <dd>{latestPrediction ? formatNumber(latestPrediction.interval.risk_score, 1) : "Unknown"}</dd>
+              <dt>리스크</dt>
+              <dd>{latestPrediction ? formatNumber(latestPrediction.interval.risk_score, 1) : "확인 불가"}</dd>
             </div>
             <div>
               <dt>MAE</dt>
-              <dd>{data.mlJob ? formatNumber(data.mlJob.error_summary.mean_absolute_error, 2) : "Unknown"}</dd>
+              <dd>{data.mlJob ? formatNumber(data.mlJob.error_summary.mean_absolute_error, 2) : "확인 불가"}</dd>
             </div>
           </dl>
         </article>
 
         <article className="chart-panel">
           <header>
-            <h2>Model Performance</h2>
+            <h2>모델 성능</h2>
             <Activity size={18} />
           </header>
           <dl className="forecast-list">
             <div>
-              <dt>Samples</dt>
-              <dd>{modelPerformance ? modelPerformance.sample_count : "Unknown"}</dd>
+              <dt>샘플</dt>
+              <dd>{modelPerformance ? modelPerformance.sample_count : "확인 불가"}</dd>
             </div>
             <div>
               <dt>MAE</dt>
               <dd>
                 {modelPerformance
                   ? formatNumber(modelPerformance.mean_absolute_error, 2)
-                  : "Unknown"}
+                  : "확인 불가"}
               </dd>
             </div>
             <div>
@@ -2106,11 +2288,11 @@ function App() {
               <dd>
                 {modelPerformance
                   ? formatErrorPct(modelPerformance.mean_absolute_pct_error)
-                  : "Unknown"}
+                  : "확인 불가"}
               </dd>
             </div>
             <div>
-              <dt>Security</dt>
+              <dt>종목</dt>
               <dd>{modelPerformance?.security_id ?? form.securityId}</dd>
             </div>
           </dl>
@@ -2118,30 +2300,30 @@ function App() {
 
         <article className="wide-panel">
           <header>
-            <h2>Security ML</h2>
+            <h2>종목 ML</h2>
             <LineChart size={18} />
           </header>
           <div className="index-strip">
-            <span>Status</span>
+            <span>상태</span>
             <strong className={mlIssue ? "critical" : statusTone(data.mlJob?.job.status)}>
               {mlIssue || statusLabel(data.mlJob?.job.status)}
             </strong>
-            <span>Predictions</span>
-            <strong>{data.mlJob ? data.mlJob.predictions.length : "Unknown"}</strong>
-            <span>Samples</span>
-            <strong>{modelPerformance ? modelPerformance.sample_count : "Unknown"}</strong>
+            <span>예측</span>
+            <strong>{data.mlJob ? data.mlJob.predictions.length : "확인 불가"}</strong>
+            <span>샘플</span>
+            <strong>{modelPerformance ? modelPerformance.sample_count : "확인 불가"}</strong>
           </div>
-          <div className="range-table" role="table" aria-label="Security ML predictions">
+          <div className="range-table" role="table" aria-label="종목 ML 예측">
             <div className="range-row range-head" role="row">
-              <span>Horizon</span>
-              <span>Target</span>
-              <span>Mid</span>
-              <span>Risk</span>
+              <span>기간</span>
+              <span>목표일</span>
+              <span>중앙값</span>
+              <span>리스크</span>
             </div>
             {(data.mlJob?.predictions ?? []).map((prediction) => (
               <div className="range-row" role="row" key={prediction.prediction_id}>
-                <span>{prediction.horizon.toUpperCase()}</span>
-                <span>{new Date(prediction.target_at).toLocaleDateString("en-US")}</span>
+                <span>{horizonLabel(prediction.horizon)}</span>
+                <span>{new Date(prediction.target_at).toLocaleDateString("ko-KR")}</span>
                 <span>{formatNumber(prediction.interval.price_mid, 0)}</span>
                 <span>{formatNumber(prediction.interval.risk_score, 1)}</span>
               </div>
@@ -2151,60 +2333,60 @@ function App() {
 
         <article className="wide-panel">
           <header>
-            <h2>Risk Index</h2>
+            <h2>리스크 지수</h2>
             <LineChart size={18} />
           </header>
           <div className="index-strip">
-            <span>Volatility</span>
-            <strong>{latestIndex ? formatNumber(latestIndex.volatility_index, 1) : "Unknown"}</strong>
-            <span>Risk</span>
-            <strong>{latestIndex ? formatNumber(latestIndex.risk_score, 1) : "Unknown"}</strong>
-            <span>Lookahead</span>
-            <strong>{data.backtest ? data.backtest.lookahead_violation_count : "Unknown"}</strong>
+            <span>변동성</span>
+            <strong>{latestIndex ? formatNumber(latestIndex.volatility_index, 1) : "확인 불가"}</strong>
+            <span>리스크</span>
+            <strong>{latestIndex ? formatNumber(latestIndex.risk_score, 1) : "확인 불가"}</strong>
+            <span>룩어헤드</span>
+            <strong>{data.backtest ? data.backtest.lookahead_violation_count : "확인 불가"}</strong>
           </div>
         </article>
 
         <article className="wide-panel">
           <header>
-            <h2>Headline Risk</h2>
+            <h2>뉴스 리스크</h2>
             <AlertTriangle size={18} />
           </header>
           <dl className="forecast-list">
             <div>
-              <dt>Signals</dt>
-              <dd>{data.headlineRisk ? data.headlineRisk.signals.length : "Unknown"}</dd>
+              <dt>신호</dt>
+              <dd>{data.headlineRisk ? data.headlineRisk.signals.length : "확인 불가"}</dd>
             </div>
             <div>
-              <dt>Clusters</dt>
-              <dd>{data.headlineRisk ? data.headlineRisk.clusters.length : "Unknown"}</dd>
+              <dt>클러스터</dt>
+              <dd>{data.headlineRisk ? data.headlineRisk.clusters.length : "확인 불가"}</dd>
             </div>
             <div>
-              <dt>Affected</dt>
-              <dd>{headlineSignal ? headlineSignal.security_ids.join(", ") : "Unknown"}</dd>
+              <dt>영향 종목</dt>
+              <dd>{headlineSignal ? headlineSignal.security_ids.join(", ") : "확인 불가"}</dd>
             </div>
             <div>
-              <dt>Groups</dt>
-              <dd>{headlineSignal ? headlineSignal.group_ids.join(", ") : "Unknown"}</dd>
+              <dt>그룹</dt>
+              <dd>{headlineSignal ? headlineSignal.group_ids.map(groupLabel).join(", ") : "확인 불가"}</dd>
             </div>
           </dl>
         </article>
 
         <article className="wide-panel">
           <header>
-            <h2>Operations</h2>
+            <h2>운영 상태</h2>
             <ServerCog size={18} />
           </header>
           <div className="ops-grid">
             {(data.operations?.components ?? []).map((item) => (
               <div className="ops-row" key={item.component}>
-                <span>{item.component}</span>
+                <span>{componentLabel(item.component)}</span>
                 <strong className={statusTone(item.status)}>{statusLabel(item.status)}</strong>
-                <em>{item.detail}</em>
+                <em>{operationDetailLabel(item.detail)}</em>
               </div>
             ))}
             {data.backupStatus ? (
               <div className="ops-row">
-                <span>backup_restore</span>
+                <span>백업/복구</span>
                 <strong className={statusTone(data.backupStatus.status)}>{statusLabel(data.backupStatus.status)}</strong>
                 <em>{backupStatusDetail(data.backupStatus)}</em>
               </div>
@@ -2214,13 +2396,13 @@ function App() {
 
         <article className="wide-panel">
           <header>
-            <h2>Provider Health</h2>
+            <h2>데이터 공급자 상태</h2>
             <Database size={18} />
           </header>
           <div className="ops-grid">
             {(data.providerHealth?.components ?? []).map((item) => (
               <div className="ops-row provider-row" key={item.component}>
-                <span>{item.component.replace("provider:", "")}</span>
+                <span>{providerComponentLabel(item.component)}</span>
                 <strong className={statusTone(item.status)}>{statusLabel(item.status)}</strong>
                 <em>
                   {providerLicenseSummary(
@@ -2235,40 +2417,40 @@ function App() {
 
         <article className="wide-panel">
           <header>
-            <h2>Audit</h2>
+            <h2>감사 로그</h2>
             <ClipboardList size={18} />
           </header>
           <div className="audit-list">
             {auditRows.length ? (
               auditRows.map((event) => (
                 <div className="audit-row" key={event.event_id}>
-                  <span>{new Date(event.occurred_at).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })}</span>
-                  <strong>{event.action_code}</strong>
-                  <em>{event.target_id ?? event.target_type}</em>
+                  <span>{new Date(event.occurred_at).toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" })}</span>
+                  <strong>{auditActionLabel(event.action_code)}</strong>
+                  <em>{event.target_id ?? targetTypeLabel(event.target_type)}</em>
                 </div>
               ))
             ) : (
-              <div className="empty-row">No audit events</div>
+              <div className="empty-row">감사 이벤트가 없습니다</div>
             )}
           </div>
         </article>
 
         <article className="wide-panel">
           <header>
-            <h2>FIFO Ledger</h2>
+            <h2>FIFO 원장</h2>
             <ReceiptText size={18} />
           </header>
           <div className="audit-list">
             {fifoRows.length ? (
               fifoRows.map((row) => (
                 <div className="audit-row" key={row.id}>
-                  <span>{row.side.toUpperCase()}</span>
+                  <span>{sideLabel(row.side)}</span>
                   <strong>{formatNumber(row.quantity, 2)}</strong>
                   <em>{formatKrw(row.amount)}</em>
                 </div>
               ))
             ) : (
-              <div className="empty-row">No FIFO events</div>
+              <div className="empty-row">FIFO 이벤트가 없습니다</div>
             )}
           </div>
         </article>

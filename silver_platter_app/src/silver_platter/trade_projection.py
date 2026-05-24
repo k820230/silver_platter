@@ -180,43 +180,43 @@ def _risk_guidance(risk_score: float, risk_status: str) -> Dict[str, object]:
         return _guidance(
             "avoid",
             "critical",
-            "Do not open a new buy until blocking risk inputs are resolved.",
+            "차단 리스크가 해소될 때까지 신규 진입을 보류해야 합니다.",
             [
-                "Cancel or postpone the order.",
-                "Resolve blocked liquidity, size, or automation limits first.",
-                "Re-run preview after reducing size or improving data quality.",
+                "주문을 취소하거나 보류합니다.",
+                "유동성, 주문 규모, 자동 주문 제한을 먼저 해소합니다.",
+                "수량을 줄이거나 데이터 품질을 보강한 뒤 다시 미리보기를 실행합니다.",
             ],
         )
     if risk_score >= 60.0:
         return _guidance(
             "reduce",
             "high",
-            "Risk is high; use a smaller position or wait for a better entry.",
+            "리스크가 높으므로 주문 규모를 줄이거나 더 나은 진입 가격을 기다리는 편이 적절합니다.",
             [
-                "Reduce order size and use a limit order.",
-                "Split the entry across multiple sessions.",
-                "Require stronger expected return before entering.",
+                "주문 규모를 줄이고 지정가 주문을 사용합니다.",
+                "여러 거래 구간으로 나누어 진입합니다.",
+                "기대 수익률이 더 높아질 때까지 진입 기준을 강화합니다.",
             ],
         )
     if risk_score >= 35.0:
         return _guidance(
             "stage",
             "moderate",
-            "Risk is moderate; staged entry and tighter review are appropriate.",
+            "리스크가 보통 수준이므로 분할 진입과 추가 점검이 적절합니다.",
             [
-                "Use a limit order near the planned entry price.",
-                "Keep position size below the normal allocation.",
-                "Review price and event risk again before adding.",
+                "계획한 진입가에 가까운 지정가 주문을 사용합니다.",
+                "포지션 규모를 평소 배분보다 낮게 유지합니다.",
+                "추가 매수 전 가격과 이벤트 리스크를 다시 점검합니다.",
             ],
         )
     return _guidance(
         "proceed",
         "low",
-        "Risk is low enough for the planned trade assumptions.",
+        "현재 가정에서는 계획한 거래를 진행할 수 있는 낮은 리스크입니다.",
         [
-            "Proceed within the planned position size.",
-            "Keep the target and break-even periods visible after entry.",
-            "Re-check risk if price or volume moves sharply.",
+            "계획한 포지션 규모 안에서 진행합니다.",
+            "진입 후 목표가와 손익분기 예상 기간을 계속 확인합니다.",
+            "가격이나 거래량이 급격히 변하면 리스크를 다시 점검합니다.",
         ],
     )
 
