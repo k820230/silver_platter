@@ -4,13 +4,39 @@ set -euo pipefail
 API_URL="${API_URL:-http://localhost:8000}"
 STAMP="$(date +%s)"
 SNAPSHOT_DIR="$(mktemp -d)"
-trap 'rm -rf "${SNAPSHOT_DIR}"' EXIT
 SNAPSHOT_FILE="${SNAPSHOT_DIR}/smoke-price-bars.jsonl"
+SERVER_SNAPSHOT_FILE="${SNAPSHOT_FILE}"
+REMOTE_SNAPSHOT_DIR=""
+
+cleanup() {
+  rm -rf "${SNAPSHOT_DIR}"
+  if [ -n "${REMOTE_SNAPSHOT_DIR}" ] && command -v docker-compose >/dev/null 2>&1; then
+    docker-compose -f "${APP_DIR}/docker-compose.yml" exec -T api rm -rf "${REMOTE_SNAPSHOT_DIR}" >/dev/null 2>&1 || true
+  fi
+}
+
+trap cleanup EXIT
+
+APP_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 
 printf '%s\n' \
   '{"security_id":"AAPL","bar_ts":"2026-05-21T09:00:00","close_price":200.0,"volume":1000,"turnover_krw":200000,"available_to_model_at":"2026-05-21T09:00:00"}' \
   '{"security_id":"AAPL","bar_ts":"2026-05-22T09:00:00","close_price":202.0,"volume":1000,"turnover_krw":202000,"available_to_model_at":"2026-05-22T09:00:00"}' \
   > "${SNAPSHOT_FILE}"
+
+if [ "${SMOKE_API_COPY_SNAPSHOT_TO_COMPOSE:-auto}" != "0" ] && command -v docker-compose >/dev/null 2>&1; then
+  case "${API_URL}" in
+    http://localhost:*|http://127.0.0.1:*)
+      API_CONTAINER_ID="$(docker-compose -f "${APP_DIR}/docker-compose.yml" ps -q api 2>/dev/null || true)"
+      if [ -n "${API_CONTAINER_ID}" ] && [ "$(docker inspect -f '{{.State.Running}}' "${API_CONTAINER_ID}" 2>/dev/null || true)" = "true" ]; then
+        REMOTE_SNAPSHOT_DIR="/tmp/silver-platter-smoke-${STAMP}"
+        SERVER_SNAPSHOT_FILE="${REMOTE_SNAPSHOT_DIR}/smoke-price-bars.jsonl"
+        docker-compose -f "${APP_DIR}/docker-compose.yml" exec -T api mkdir -p "${REMOTE_SNAPSHOT_DIR}" >/dev/null
+        docker cp "${SNAPSHOT_FILE}" "${API_CONTAINER_ID}:${SERVER_SNAPSHOT_FILE}" >/dev/null
+      fi
+      ;;
+  esac
+fi
 
 curl -fsS "${API_URL}/health" >/dev/null
 
@@ -58,7 +84,7 @@ curl -fsS -X POST "${API_URL}/api/backtests/run" \
 
 curl -fsS -X POST "${API_URL}/api/backtests/replay-exported-snapshot" \
   -H 'Content-Type: application/json' \
-  -d "{\"run_id\":\"smoke-replay-${STAMP}\",\"strategy_id\":\"smoke\",\"strategy_plugin_id\":\"momentum-threshold\",\"strategy_parameters\":{\"min_return_pct\":0.005},\"from_date\":\"2026-05-21\",\"to_date\":\"2026-05-22\",\"security_id\":\"AAPL\",\"market\":\"US\",\"quantity\":2,\"avg_daily_turnover_20d_krw\":1000000000,\"required_min_days\":2,\"snapshot_paths\":[\"${SNAPSHOT_FILE}\"]}" >/dev/null
+  -d "{\"run_id\":\"smoke-replay-${STAMP}\",\"strategy_id\":\"smoke\",\"strategy_plugin_id\":\"momentum-threshold\",\"strategy_parameters\":{\"min_return_pct\":0.005},\"from_date\":\"2026-05-21\",\"to_date\":\"2026-05-22\",\"security_id\":\"AAPL\",\"market\":\"US\",\"quantity\":2,\"avg_daily_turnover_20d_krw\":1000000000,\"required_min_days\":2,\"snapshot_paths\":[\"${SERVER_SNAPSHOT_FILE}\"]}" >/dev/null
 
 curl -fsS "${API_URL}/api/backtests/strategy-plugins" >/dev/null
 
