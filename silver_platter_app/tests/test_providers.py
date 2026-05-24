@@ -5,11 +5,13 @@ from tempfile import TemporaryDirectory
 from unittest import TestCase
 from unittest.mock import patch
 
+from silver_platter.broker import KoreaInvestmentCredentials
 from silver_platter.providers import (
     CsvFxRateProvider,
     DisclosureMetadataInput,
     EcosFxRateProvider,
     FxRateInput,
+    KoreaInvestmentDailyPriceProvider,
     KrxDailyPriceProvider,
     KrxKindDisclosureProvider,
     OpenDartDisclosureProvider,
@@ -267,6 +269,57 @@ class ProviderTests(TestCase):
         self.assertEqual("searchDisclosureByCorpMain", calls[0][2]["method"])
         self.assertEqual("005930", calls[0][2]["searchCorpName"])
         self.assertEqual("2026-05-01", calls[0][2]["fromDate"])
+
+    def test_kis_daily_price_provider_normalizes_domestic_chart_rows(self):
+        class FakeTransport:
+            def __init__(self):
+                self.posts = []
+                self.gets = []
+
+            def post(self, path, headers, body):
+                self.posts.append((path, headers, body))
+                return {"access_token": "token-1"}
+
+            def get(self, path, headers, params):
+                self.gets.append((path, headers, params))
+                return {
+                    "output2": [
+                        {
+                            "stck_bsop_date": "20260522",
+                            "stck_clpr": "70500",
+                            "acml_vol": "1,234",
+                            "acml_tr_pbmn": "87000000",
+                        }
+                    ]
+                }
+
+        transport = FakeTransport()
+        provider = KoreaInvestmentDailyPriceProvider(
+            KoreaInvestmentCredentials("app", "secret", "12345678"),
+            transport,
+            start_date=date(2026, 5, 1),
+            end_date=date(2026, 5, 22),
+        )
+
+        bars = list(provider.get_price_bars("005930.KS"))
+
+        self.assertEqual("kis_domestic_daily_price", provider.metadata.provider_code)
+        self.assertEqual(1, len(bars))
+        self.assertEqual("005930", bars[0].security_id)
+        self.assertEqual(datetime(2026, 5, 22, 16, 0, 0), bars[0].bar_ts)
+        self.assertEqual(70500.0, bars[0].close_price)
+        self.assertEqual(1234.0, bars[0].volume)
+        self.assertEqual(87000000.0, bars[0].turnover_krw)
+        self.assertEqual("/oauth2/tokenP", transport.posts[0][0])
+        self.assertEqual(
+            "/uapi/domestic-stock/v1/quotations/inquire-daily-itemchartprice",
+            transport.gets[0][0],
+        )
+        self.assertEqual("Bearer token-1", transport.gets[0][1]["authorization"])
+        self.assertEqual("FHKST03010100", transport.gets[0][1]["tr_id"])
+        self.assertEqual("005930", transport.gets[0][2]["FID_INPUT_ISCD"])
+        self.assertEqual("20260501", transport.gets[0][2]["FID_INPUT_DATE_1"])
+        self.assertEqual("20260522", transport.gets[0][2]["FID_INPUT_DATE_2"])
 
     def test_opendart_provider_normalizes_disclosure_metadata(self):
         calls = []

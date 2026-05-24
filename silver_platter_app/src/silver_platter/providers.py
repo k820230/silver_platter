@@ -571,6 +571,132 @@ class KrxDailyPriceProvider(MarketDataProvider):
         )
 
 
+class KoreaInvestmentDailyPriceProvider(MarketDataProvider):
+    def __init__(
+        self,
+        credentials: object,
+        transport: object,
+        start_date: date,
+        end_date: date,
+        access_token: Optional[str] = None,
+    ):
+        if start_date > end_date:
+            raise ValueError("start_date must be on or before end_date")
+        self._metadata = ProviderMetadata(
+            provider_code="kis_domestic_daily_price",
+            provider_type="market_data",
+            can_store=True,
+            can_display_realtime=False,
+            can_redistribute=False,
+            priority=20,
+        )
+        self._credentials = credentials
+        self._transport = transport
+        self._start_date = start_date
+        self._end_date = end_date
+        self._access_token = access_token
+
+    @property
+    def metadata(self) -> ProviderMetadata:
+        return self._metadata
+
+    def get_price_bars(self, symbol: str) -> Iterable[PriceBarInput]:
+        provider_symbol = _normalize_kis_domestic_symbol(symbol)
+        response = self._transport.get(
+            "/uapi/domestic-stock/v1/quotations/inquire-daily-itemchartprice",
+            self._auth_headers("FHKST03010100"),
+            {
+                "FID_COND_MRKT_DIV_CODE": "J",
+                "FID_INPUT_ISCD": provider_symbol,
+                "FID_INPUT_DATE_1": self._start_date.strftime("%Y%m%d"),
+                "FID_INPUT_DATE_2": self._end_date.strftime("%Y%m%d"),
+                "FID_PERIOD_DIV_CODE": "D",
+                "FID_ORG_ADJ_PRC": "0",
+            },
+        )
+        rows = response.get("output2", [])
+        if not isinstance(rows, list):
+            rows = []
+        return [
+            self._normalize_row(provider_symbol, row)
+            for row in rows
+            if isinstance(row, dict)
+        ]
+
+    def _auth_headers(self, tr_id: str) -> Dict[str, str]:
+        token = self._get_access_token()
+        return {
+            "content-type": "application/json",
+            "authorization": "Bearer %s" % token,
+            "appkey": str(getattr(self._credentials, "app_key")),
+            "appsecret": str(getattr(self._credentials, "app_secret")),
+            "tr_id": tr_id,
+            "custtype": str(getattr(self._credentials, "customer_type", "P")),
+        }
+
+    def _get_access_token(self) -> str:
+        if self._access_token:
+            return self._access_token
+        response = self._transport.post(
+            "/oauth2/tokenP",
+            {"content-type": "application/json"},
+            {
+                "grant_type": "client_credentials",
+                "appkey": str(getattr(self._credentials, "app_key")),
+                "appsecret": str(getattr(self._credentials, "app_secret")),
+            },
+        )
+        token = str(response.get("access_token", ""))
+        if not token:
+            raise RuntimeError("KIS OAuth response did not include access_token")
+        self._access_token = token
+        return token
+
+    def _normalize_row(self, symbol: str, row: Dict[str, object]) -> PriceBarInput:
+        raw_date = _dict_value(row, ("stck_bsop_date", "STCK_BSOP_DATE"))
+        if len(raw_date) != 8:
+            raise ValueError("KIS daily price row is missing stck_bsop_date")
+        market_date = date.fromisoformat(
+            "%s-%s-%s" % (raw_date[0:4], raw_date[4:6], raw_date[6:8])
+        )
+        available_at = datetime.combine(market_date, time(16, 0, 0))
+        return PriceBarInput(
+            security_id=symbol,
+            bar_ts=available_at,
+            close_price=_float_or_none(
+                _dict_value(row, ("stck_clpr", "STCK_CLPR", "close_price"))
+            ),
+            volume=_float_or_none(_dict_value(row, ("acml_vol", "ACML_VOL", "volume"))),
+            turnover_krw=_float_or_none(
+                _dict_value(row, ("acml_tr_pbmn", "ACML_TR_PBMN", "turnover_krw"))
+            ),
+            available_to_model_at=available_at,
+        )
+
+
+def _normalize_kis_domestic_symbol(symbol: str) -> str:
+    normalized = symbol.strip().upper()
+    if normalized.endswith(".KS") or normalized.endswith(".KQ"):
+        normalized = normalized.rsplit(".", 1)[0]
+    if not normalized:
+        raise ValueError("symbol is required")
+    return normalized
+
+
+def _dict_value(row: Dict[str, object], names: Sequence[str]) -> str:
+    for name in names:
+        value = row.get(name)
+        if value is not None:
+            return str(value).strip()
+    return ""
+
+
+def _float_or_none(value: str) -> Optional[float]:
+    if value == "":
+        return None
+    return float(value.replace(",", ""))
+
+
 def _sec_column_value(columns: Dict[str, Sequence[Any]], name: str, index: int) -> str:
     values = columns.get(name, [])
     if index >= len(values) or values[index] is None:
