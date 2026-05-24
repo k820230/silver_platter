@@ -1,0 +1,67 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+cd "$(dirname "$0")/.."
+
+blocked=0
+
+ready() {
+  printf 'ready: %s\n' "$1"
+}
+
+block() {
+  blocked=1
+  printf 'blocked: %s - %s\n' "$1" "$2"
+}
+
+user_agent="${SEC_EDGAR_USER_AGENT:-}"
+if [ -n "${user_agent}" ] && ! printf '%s' "${user_agent}" | grep -qi 'example.com'; then
+  ready "SEC EDGAR User-Agent"
+else
+  block "SEC EDGAR User-Agent" "set SEC_EDGAR_USER_AGENT to a real contact User-Agent"
+fi
+
+if [ -n "${OPENDART_API_KEY:-}" ]; then
+  ready "OpenDART API key"
+else
+  block "OpenDART API key" "set OPENDART_API_KEY"
+fi
+
+if [ -n "${ECOS_API_KEY:-}" ]; then
+  ready "ECOS API key"
+else
+  block "ECOS API key" "set ECOS_API_KEY"
+fi
+
+if [ -n "${ALERT_WEBHOOK_URL:-}" ]; then
+  ready "alert webhook URL"
+else
+  block "alert webhook URL" "set ALERT_WEBHOOK_URL"
+fi
+
+if [ "${KRX_PRICE_SMOKE_ENABLED:-0}" = "1" ]; then
+  ready "KRX price smoke opt-in"
+else
+  block "KRX price smoke opt-in" "set KRX_PRICE_SMOKE_ENABLED=1 and optionally KRX_PRICE_SMOKE_DATE"
+fi
+
+snapshot_path="${LONG_REPLAY_SNAPSHOT_PATH:-${REPLAY_SNAPSHOT_PATH:-}}"
+if [ -n "${snapshot_path}" ] && [ -e "${snapshot_path}" ]; then
+  ready "long replay snapshot"
+else
+  block "long replay snapshot" "set LONG_REPLAY_SNAPSHOT_PATH to an existing snapshot file or directory"
+fi
+
+if [ "${G7_LIVE_SMOKE_APPROVED:-0}" = "1" ]; then
+  ready "G7 live/paper smoke approval"
+else
+  block "G7 live/paper smoke approval" "set G7_LIVE_SMOKE_APPROVED=1 only after account/risk scope is approved"
+fi
+
+if [ "${blocked}" -eq 0 ]; then
+  echo "external smoke readiness passed"
+else
+  echo "external smoke readiness blocked"
+fi
+
+exit "${blocked}"

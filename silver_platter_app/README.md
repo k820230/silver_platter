@@ -57,6 +57,7 @@ cd /home/jhkim5/silver_platter/silver_platter_app
 ./scripts/ofac_recent_actions_smoke
 ./scripts/provider_smoke
 ./scripts/alert_webhook_smoke
+./scripts/external_smoke_readiness
 docker-compose config
 npm --prefix web install
 npm --prefix web run build
@@ -78,11 +79,12 @@ Set `WATCHLIST_STORE_PATH` to persist API watchlist changes to a local JSON file
 `./scripts/ofac_recent_actions_smoke` is read-only and skips unless `OFAC_RECENT_ACTIONS_SMOKE_ENABLED=1` is configured.
 `./scripts/provider_smoke` runs the guarded SEC EDGAR, OpenDART, KRX KIND, KRX price, ECOS FX, official RSS, and OFAC smoke checks.
 `./scripts/alert_webhook_smoke` sends one test alert and skips unless `ALERT_WEBHOOK_URL` is configured.
+`./scripts/external_smoke_readiness` summarizes the external keys, webhook URL, snapshot, and approval flags needed for the remaining non-local smoke checks.
 `./scripts/collect_verification_evidence` writes a local gate evidence JSON bundle under `var/verification/` by default; use `--run-smoke-api` to include API smoke evidence and `--write-goldilocks` to persist assessments/evidence through the configured Goldilocks repository writer.
 
 ## MVP Defaults
 
-- DBMS: Goldilocks, external listener at `host.docker.internal:22581`
+- DBMS: Goldilocks, compose dev listener at `host.docker.internal:11100`
 - Schema: `SP`
 - Single security investment amount: KRW 100,000 to KRW 1,000,000,000
 - Auto order max amount: KRW 1,000,000,000

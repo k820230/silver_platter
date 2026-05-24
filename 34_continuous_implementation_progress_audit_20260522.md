@@ -228,6 +228,7 @@
 - `./scripts/krx_price_smoke` skip 확인: KRX_PRICE_SMOKE_ENABLED 설정 없음
 - `./scripts/ecos_fx_smoke` skip 확인: ECOS_API_KEY 설정 없음
 - `./scripts/provider_smoke` skip 확인: guarded provider smoke suite
+- `./scripts/external_smoke_readiness` 추가: 남은 외부 key/webhook/snapshot/G7 승인 조건 요약
 - `./scripts/official_rss_smoke` skip 확인: OFFICIAL_RSS_SMOKE_ENABLED 설정 없음
 - `./scripts/ofac_recent_actions_smoke` skip 확인: OFAC_RECENT_ACTIONS_SMOKE_ENABLED 설정 없음
 - `OFFICIAL_RSS_SMOKE_ENABLED=1 ./scripts/official_rss_smoke` 통과: Federal Reserve/ECB 각 5건 headline 응답
