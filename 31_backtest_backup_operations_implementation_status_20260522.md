@@ -81,9 +81,11 @@
 - MVP 백업 스케줄: 토요일 10:00
 - MVP restore drill 스케줄: 매월 1일 11:00
 - 현재 시각 이후 다음 백업 예정 시각 계산
+- 현재 시각 기준 최근 due 백업 예정 시각 계산
 - 현재 시각 이후 다음 restore drill 예정 시각 계산
 - 월말 길이가 짧은 달의 restore drill 일자 보정
 - scheduler startup time을 `APP_TIMEZONE` 기준 aware datetime으로 계산
+- scheduler run-once backup wrapper 실행/skip/failure 결과 분류
 - scheduler startup log에 다음 백업 예정 시각 표시
 
 ## 4. 테스트
@@ -147,7 +149,11 @@
 - backup manifest base path escape 실패 검출
 - backup manifest directory entry 실패 검출
 - 토요일 10:00 다음 실행 시각 계산
+- 토요일 10:00 최근 due 실행 시각 계산
 - scheduler KST timezone 보존
+- scheduler due backup wrapper 실행
+- scheduler due backup 기존 manifest skip
+- scheduler due backup wrapper skip/failure 결과 분류
 - 매월 restore drill 다음 실행 시각 계산
 - 31일 schedule의 짧은 달 마지막 일자 보정
 

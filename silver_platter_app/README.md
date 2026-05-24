@@ -23,7 +23,7 @@ All project artifacts are managed under `/home/jhkim5/silver_platter`. Do not cr
 - Goldilocks repository writer for provider, security, manifest, quality, price bar, audit, headline, order state, backtest, scenario, restore check, verification gate, and alert delivery rows
 - Execution posting, broker reconciliation, order state machine, idempotency, paper/KIS guarded broker boundary with orderability query smoke, kill switch, and event-risk controls
 - Watchlist, ML prediction job, prediction actual/error tracking, and volatility/risk index chart helpers
-- Backtest/replay lookahead guard, strategy plugin registry, exported snapshot replay runner, paper replay evidence, scenario shock helper, backup manifest/restore-check/status helpers, backup execution lock, and backup/restore scheduler helpers
+- Backtest/replay lookahead guard, strategy plugin registry, exported snapshot replay runner, paper replay evidence, scenario shock helper, backup manifest/restore-check/status helpers, backup execution lock, and backup/restore scheduler helpers with run-once due backup triggering
 - API boundary checks for strategy, replay, and headline risk signal input errors
 - Audit log, operations summary, provider health/catalog with license-policy detail, and alert delivery helpers
 - Verification gate/evidence assessment helper

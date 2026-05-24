@@ -132,13 +132,14 @@
 - scheduler
 - monthly restore drill scheduler
 - scheduler startup KST timezone handling
+- scheduler due backup run-once trigger
 - alert delivery
 - verification gate
 - G6 paper replay gate evidence
 - G7 live safety gate evidence
 - migration coverage
 
-현재 테스트 수: 173개
+현재 테스트 수: 179개
 
 ## 7. 검증 증적
 
