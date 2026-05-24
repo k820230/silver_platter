@@ -317,12 +317,11 @@ def connect_goldilocks_from_env() -> object:
             )
         else:
             connect_string = (
-                "DRIVER={%s};SERVER=%s;PORT=%s;DATABASE=%s;UID=%s;PWD=%s"
+                "DRIVER=%s;HOST=%s;PORT=%s;UID=%s;PWD=%s"
                 % (
                     driver,
                     settings.host,
                     settings.port,
-                    settings.database,
                     settings.user,
                     settings.password,
                 )

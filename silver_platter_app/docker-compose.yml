@@ -1,11 +1,42 @@
 version: "3.7"
 
+x-app-environment: &app-environment
+  GOLDILOCKS_HOST: ${GOLDILOCKS_DOCKER_HOST:-host.docker.internal}
+  GOLDILOCKS_PORT: ${GOLDILOCKS_PORT:-11100}
+  GOLDILOCKS_DATABASE: ${GOLDILOCKS_DATABASE:-GOLDILOCKS}
+  GOLDILOCKS_SCHEMA: ${GOLDILOCKS_SCHEMA:-SP}
+  GOLDILOCKS_USER: ${GOLDILOCKS_USER:-sp_app}
+  GOLDILOCKS_PASSWORD: ${GOLDILOCKS_PASSWORD:-}
+  GOLDILOCKS_ODBC_CONNECT_STRING: ${GOLDILOCKS_DOCKER_ODBC_CONNECT_STRING:-}
+  GOLDILOCKS_ODBC_DSN: ${GOLDILOCKS_ODBC_DSN:-}
+  GOLDILOCKS_ODBC_DRIVER: ${GOLDILOCKS_ODBC_DRIVER:-}
+  GOLDILOCKS_HOME: ${GOLDILOCKS_HOME:-/home/jhkim5/work/product/Gliese/home}
+  GOLDILOCKS_DATA: ${GOLDILOCKS_DATA:-/home/jhkim5/work/product/Gliese/home}
+  LD_LIBRARY_PATH: ${GOLDILOCKS_CLIENT_LIB_DIR:-/home/jhkim5/work/product/Gliese/home/lib}
+  RAW_DATA_DIR: ${RAW_DATA_DIR:-/home/jhkim5/silver_platter_data/raw}
+  OPENDART_API_KEY: ${OPENDART_API_KEY:-}
+  ECOS_API_KEY: ${ECOS_API_KEY:-}
+  SEC_EDGAR_USER_AGENT: ${SEC_EDGAR_USER_AGENT:-Silver Platter admin@example.com}
+  KIS_APP_KEY: ${KIS_APP_KEY:-}
+  KIS_APP_SECRET: ${KIS_APP_SECRET:-}
+  KIS_ACCOUNT_NO: ${KIS_ACCOUNT_NO:-}
+  KIS_ACCOUNT_PRODUCT_CODE: ${KIS_ACCOUNT_PRODUCT_CODE:-01}
+  KIS_API_BASE_URL: ${KIS_API_BASE_URL:-}
+  KIS_TRADING_ENV: ${KIS_TRADING_ENV:-demo}
+  KIS_ACCESS_TOKEN: ${KIS_ACCESS_TOKEN:-}
+  KIS_TOKEN_CACHE_PATH: ${KIS_TOKEN_CACHE_PATH:-}
+  HISTORY_PREFETCH_LOOKBACK_DAYS: ${HISTORY_PREFETCH_LOOKBACK_DAYS:-365}
+
 services:
   web:
     build:
       context: .
       dockerfile: docker/web.Dockerfile
     env_file: .env.example
+    environment:
+      VITE_API_PROXY_TARGET: http://host.docker.internal:8000
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     ports:
       - "3000:3000"
     depends_on:
@@ -17,11 +48,12 @@ services:
       dockerfile: docker/api.Dockerfile
     env_file: .env.example
     environment:
-      GOLDILOCKS_PORT: ${GOLDILOCKS_PORT:-11100}
-    ports:
-      - "8000:8000"
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
+      <<: *app-environment
+      GOLDILOCKS_HOST: ${GOLDILOCKS_HOST:-127.0.0.1}
+    network_mode: host
+    volumes:
+      - ${GOLDILOCKS_HOME:-/home/jhkim5/work/product/Gliese/home}:${GOLDILOCKS_HOME:-/home/jhkim5/work/product/Gliese/home}:ro
+      - ${RAW_DATA_DIR:-/home/jhkim5/silver_platter_data/raw}:${RAW_DATA_DIR:-/home/jhkim5/silver_platter_data/raw}
     depends_on:
       - redis
 
@@ -32,9 +64,12 @@ services:
     command: ["python", "-m", "silver_platter.worker.main"]
     env_file: .env.example
     environment:
-      GOLDILOCKS_PORT: ${GOLDILOCKS_PORT:-11100}
+      <<: *app-environment
     extra_hosts:
       - "host.docker.internal:host-gateway"
+    volumes:
+      - ${GOLDILOCKS_HOME:-/home/jhkim5/work/product/Gliese/home}:${GOLDILOCKS_HOME:-/home/jhkim5/work/product/Gliese/home}:ro
+      - ${RAW_DATA_DIR:-/home/jhkim5/silver_platter_data/raw}:${RAW_DATA_DIR:-/home/jhkim5/silver_platter_data/raw}
     depends_on:
       - redis
 
@@ -45,12 +80,14 @@ services:
     command: ["python", "-m", "silver_platter.worker.scheduler"]
     env_file: .env.example
     environment:
-      GOLDILOCKS_PORT: ${GOLDILOCKS_PORT:-11100}
+      <<: *app-environment
     extra_hosts:
       - "host.docker.internal:host-gateway"
     depends_on:
       - redis
     volumes:
+      - ${GOLDILOCKS_HOME:-/home/jhkim5/work/product/Gliese/home}:${GOLDILOCKS_HOME:-/home/jhkim5/work/product/Gliese/home}:ro
+      - ${RAW_DATA_DIR:-/home/jhkim5/silver_platter_data/raw}:${RAW_DATA_DIR:-/home/jhkim5/silver_platter_data/raw}
       - /home/jhkim5/backup_sp:/home/jhkim5/backup_sp
 
   redis:
