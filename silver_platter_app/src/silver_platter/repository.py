@@ -138,6 +138,62 @@ class GoldilocksRepository:
         row = _fetch_one(cursor)
         return None if row is None else int(row[0])
 
+    def search_securities(
+        self,
+        query: str,
+        market_code: str = "",
+        limit: int = 20,
+    ) -> List[Dict[str, object]]:
+        normalized_query = query.strip().lower()
+        if not normalized_query:
+            return []
+        normalized_market = market_code.strip().upper()
+        cursor = self._execute(
+            """
+            SELECT
+                security_id,
+                symbol,
+                security_name,
+                market_code,
+                exchange_code,
+                currency
+            FROM SP.security_master
+            WHERE is_active = TRUE
+              AND (? = '' OR market_code = ?)
+              AND (
+                LOWER(symbol) LIKE ?
+                OR LOWER(security_name) LIKE ?
+              )
+            ORDER BY
+                market_code,
+                symbol
+            """,
+            (
+                normalized_market,
+                normalized_market,
+                "%%%s%%" % normalized_query,
+                "%%%s%%" % normalized_query,
+            ),
+        )
+        rows = _fetch_all(cursor)
+        items: List[Dict[str, object]] = []
+        for row in rows[:limit]:
+            latest = self._get_latest_price_bar_for_security(int(row[0]))
+            items.append(
+                {
+                    "security_db_id": int(row[0]),
+                    "security_id": str(row[1]),
+                    "security_name": str(row[2]),
+                    "market": str(row[3]),
+                    "exchange_code": "" if row[4] is None else str(row[4]),
+                    "currency": "" if row[5] is None else str(row[5]),
+                    "latest_close_price": latest["close_price"],
+                    "latest_volume": latest["volume"],
+                    "latest_bar_ts": latest["bar_ts"],
+                }
+            )
+        return items
+
     def ensure_security_id(self, security: SecurityReference) -> int:
         self.upsert_security_reference(security)
         security_id = self.get_security_id(security.market_code, security.symbol)
@@ -414,6 +470,30 @@ class GoldilocksRepository:
         return {
             "close_price": _number_or_none(row[0]),
             "volume": _number_or_none(row[1]),
+        }
+
+    def _get_latest_price_bar_for_security(
+        self,
+        security_id: int,
+        bar_interval: str = "1d",
+    ) -> Dict[str, object]:
+        cursor = self._execute(
+            """
+            SELECT close_price, volume, bar_ts
+            FROM SP.price_bar
+            WHERE security_id = ?
+              AND bar_interval = ?
+            ORDER BY bar_ts DESC
+            """,
+            (security_id, bar_interval),
+        )
+        row = _fetch_one(cursor)
+        if row is None:
+            return {"close_price": None, "volume": None, "bar_ts": None}
+        return {
+            "close_price": _number_or_none(row[0]),
+            "volume": _number_or_none(row[1]),
+            "bar_ts": _iso_datetime(row[2]),
         }
 
     def get_price_history_bars(

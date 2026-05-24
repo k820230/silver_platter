@@ -537,6 +537,7 @@ button:disabled {
   font-size: 13px;
   line-height: 1.5;
   margin: 0;
+  white-space: pre-line;
 }
 
 .evidence-grid {
@@ -644,6 +645,83 @@ select {
   width: 38px;
 }
 
+.security-lookup-panel {
+  border: 1px solid #dce3e8;
+  border-radius: 8px;
+  margin-top: 12px;
+  overflow: hidden;
+}
+
+.security-lookup-panel header {
+  align-items: center;
+  background: #f0f4f6;
+  display: flex;
+  justify-content: space-between;
+  margin: 0;
+  min-height: 36px;
+  padding: 0 10px;
+}
+
+.security-lookup-panel header strong,
+.security-lookup-panel header span {
+  font-size: 12px;
+}
+
+.security-lookup-panel header span {
+  color: #59656e;
+}
+
+.security-lookup-list {
+  display: grid;
+}
+
+.security-lookup-list p {
+  color: #59656e;
+  font-size: 12px;
+  line-height: 1.5;
+  margin: 0;
+  padding: 10px;
+  white-space: pre-line;
+}
+
+.security-lookup-row {
+  align-items: center;
+  background: #ffffff;
+  border: 0;
+  border-top: 1px solid #edf1f4;
+  color: #182026;
+  display: grid;
+  gap: 8px;
+  grid-template-columns: 74px 48px minmax(0, 1fr) minmax(82px, auto);
+  min-height: 38px;
+  padding: 0 10px;
+  text-align: left;
+}
+
+.security-lookup-row:first-child {
+  border-top: 0;
+}
+
+.security-lookup-row strong,
+.security-lookup-row span,
+.security-lookup-row em,
+.security-lookup-row small {
+  font-size: 12px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.security-lookup-row span,
+.security-lookup-row em,
+.security-lookup-row small {
+  color: #59656e;
+  font-style: normal;
+}
+
+.security-lookup-row small {
+  text-align: right;
+}
+
 .ticket-actions {
   display: flex;
   gap: 8px;
@@ -747,6 +825,7 @@ select {
 .investment-projection p {
   line-height: 1.5;
   margin: 0;
+  white-space: pre-line;
 }
 
 .projection-grid {
@@ -930,6 +1009,7 @@ select {
   font-size: 12px;
   line-height: 1.5;
   margin: 0;
+  white-space: pre-line;
 }
 
 .wide-panel {
@@ -1021,6 +1101,15 @@ select {
 
   .ticket-grid {
     grid-template-columns: 1fr;
+  }
+
+  .security-lookup-row {
+    grid-template-columns: 68px 44px minmax(0, 1fr);
+  }
+
+  .security-lookup-row small {
+    grid-column: 1 / -1;
+    text-align: left;
   }
 
   .ticket-actions {

@@ -288,6 +288,28 @@ class RepositoryTests(TestCase):
         self.assertEqual("kis_domestic_daily_price", items[0]["provider_code"])
         self.assertIn("GROUP BY", connection.commands[0][0])
 
+    def test_search_securities_matches_partial_name_and_symbol(self):
+        connection = FakeConnection()
+        connection.fetchall_results = [
+            [
+                (11, "005930", "Samsung Electronics", "KR", "KRX", "KRW"),
+                (12, "000660", "SK Hynix", "KR", "KRX", "KRW"),
+            ]
+        ]
+        connection.fetchone_results = [
+            (71000, 1200000, datetime(2026, 5, 22, 16, 0, 0)),
+            (1941000, 500000, datetime(2026, 5, 22, 16, 0, 0)),
+        ]
+        repository = GoldilocksRepository(connection)
+
+        items = repository.search_securities("sam", market_code="KR", limit=20)
+
+        self.assertEqual("005930", items[0]["security_id"])
+        self.assertEqual("Samsung Electronics", items[0]["security_name"])
+        self.assertEqual(71000.0, items[0]["latest_close_price"])
+        self.assertIn("LOWER(security_name) LIKE", connection.commands[0][0])
+        self.assertEqual(("KR", "KR", "%sam%", "%sam%"), connection.commands[0][1])
+
     def test_get_price_history_bars_reads_latest_rows_in_time_order(self):
         connection = FakeConnection()
         connection.fetchall_results = [

@@ -895,6 +895,34 @@ def security_search(request: SecuritySearchRequest) -> Dict[str, Any]:
     }
 
 
+@app.get("/api/securities/lookup")
+def security_lookup(query: str, market: str = "", limit: int = 20) -> Dict[str, Any]:
+    normalized_query = query.strip()
+    if not normalized_query:
+        raise _bad_request(ValueError("query is required"))
+    if limit <= 0 or limit > 50:
+        raise _bad_request(ValueError("limit must be between 1 and 50"))
+    try:
+        connection = connect_goldilocks_from_env()
+        try:
+            items = GoldilocksRepository(connection).search_securities(
+                normalized_query,
+                market_code=market,
+                limit=limit,
+            )
+        finally:
+            close = getattr(connection, "close", None)
+            if close is not None:
+                close()
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    return {
+        "query": normalized_query,
+        "market": market.strip().upper(),
+        "items": items,
+    }
+
+
 @app.delete("/api/watchlist/items/{user_id}/{security_id}")
 def watchlist_remove(user_id: str, security_id: str) -> Dict[str, Any]:
     _ensure_watchlists_loaded()

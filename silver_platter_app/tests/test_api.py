@@ -29,6 +29,7 @@ from silver_platter.api.main import (
     price_history_securities,
     provider_catalog,
     security_search,
+    security_lookup,
     SecuritySearchRequest,
     SettingChangeAuditRequest,
     watchlist_add,
@@ -153,6 +154,40 @@ class ApiBoundaryTests(TestCase):
         self.assertEqual(76500, payload["current_price"])
         self.assertGreater(payload["risk_score"], 0)
         self.assertIn("입력 현재가", payload["summary"])
+
+    def test_security_lookup_matches_partial_name(self):
+        class FakeConnection:
+            def __init__(self):
+                self.closed = False
+
+            def close(self):
+                self.closed = True
+
+        class FakeRepository:
+            def __init__(self, connection):
+                self.connection = connection
+
+            def search_securities(self, query, market_code="", limit=20):
+                return [
+                    {
+                        "security_id": "005930",
+                        "security_name": "Samsung Electronics",
+                        "market": market_code,
+                        "latest_close_price": 71000.0,
+                    }
+                ][:limit]
+
+        connection = FakeConnection()
+        with patch.object(api_main, "connect_goldilocks_from_env", return_value=connection), patch.object(
+            api_main,
+            "GoldilocksRepository",
+            FakeRepository,
+        ):
+            payload = security_lookup("samsung", market="KR", limit=10)
+
+        self.assertEqual("samsung", payload["query"])
+        self.assertEqual("005930", payload["items"][0]["security_id"])
+        self.assertTrue(connection.closed)
 
     def test_strategy_plugins_endpoint_lists_builtin_plugins(self):
         response = backtest_strategy_plugins()

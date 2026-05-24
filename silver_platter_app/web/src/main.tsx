@@ -10,6 +10,7 @@ import {
   Play,
   ReceiptText,
   RefreshCw,
+  Search,
   Send,
   ServerCog,
   ShieldCheck,
@@ -286,6 +287,24 @@ type SecuritySearchResponse = {
     exchange_code: string;
   };
   history_prefetch: HistoryPrefetchResult;
+};
+
+type SecurityLookupItem = {
+  security_db_id: number;
+  security_id: string;
+  security_name: string;
+  market: string;
+  exchange_code: string;
+  currency: string;
+  latest_close_price: number | null;
+  latest_volume: number | null;
+  latest_bar_ts: string | null;
+};
+
+type SecurityLookupResponse = {
+  query: string;
+  market: string;
+  items: SecurityLookupItem[];
 };
 
 type StrategyPlugin = {
@@ -815,6 +834,10 @@ function formatTimestamp(value: string | null | undefined): string {
     hour: "2-digit",
     minute: "2-digit",
   });
+}
+
+function readableText(value: string): string {
+  return value.replace(/([.!?])\s+/g, "$1\n");
 }
 
 function historyPrefetchLabel(result: HistoryPrefetchResult | null, state: RequestState): string {
@@ -1445,6 +1468,8 @@ function App() {
   const [data, setData] = useState<DashboardData>(EMPTY_DASHBOARD);
   const [preview, setPreview] = useState<OrderPreviewResponse | null>(null);
   const [submission, setSubmission] = useState<OrderSubmitResponse | null>(null);
+  const [securityLookupQuery, setSecurityLookupQuery] = useState<string>("");
+  const [securityLookupResults, setSecurityLookupResults] = useState<SecurityLookupItem[]>([]);
   const [historyPrefetch, setHistoryPrefetch] = useState<HistoryPrefetchResult | null>(null);
   const [historyRiskRange, setHistoryRiskRange] = useState<HistoryRiskRange>("1w");
   const [selectedHistorySecurity, setSelectedHistorySecurity] =
@@ -1458,6 +1483,7 @@ function App() {
   const [actionState, setActionState] = useState<RequestState>("idle");
   const [historyState, setHistoryState] = useState<RequestState>("idle");
   const [historyRiskState, setHistoryRiskState] = useState<RequestState>("idle");
+  const [securityLookupState, setSecurityLookupState] = useState<RequestState>("idle");
   const [error, setError] = useState<string>("");
 
   const refresh = useCallback(async (nextForm: OrderForm = form) => {
@@ -1604,6 +1630,30 @@ function App() {
     }
   };
 
+  const lookupSecurities = async () => {
+    const query = securityLookupQuery.trim();
+    if (!query) {
+      setSecurityLookupResults([]);
+      setSecurityLookupState("idle");
+      return;
+    }
+    setSecurityLookupState("loading");
+    setError("");
+    try {
+      const result = await apiGet<SecurityLookupResponse>(
+        `/api/securities/lookup?query=${encodeURIComponent(query)}&market=${encodeURIComponent(
+          form.market,
+        )}&limit=20`,
+      );
+      setSecurityLookupResults(result.items);
+      setSecurityLookupState("ready");
+    } catch (exc) {
+      setSecurityLookupResults([]);
+      setSecurityLookupState("error");
+      setError(exc instanceof Error ? exc.message : "종목명 검색 실패");
+    }
+  };
+
   const applySecurityToPreview = (
     securityId: string,
     market: string,
@@ -1619,6 +1669,11 @@ function App() {
     setHistoryState("idle");
     setForm(nextForm);
     void refresh(nextForm);
+  };
+
+  const applyLookupSecurityToPreview = (item: SecurityLookupItem) => {
+    setSecurityLookupQuery(item.security_name || item.security_id);
+    applySecurityToPreview(item.security_id, item.market, item.latest_close_price);
   };
 
   const priceRanges = preview?.price_ranges ?? [];
@@ -1748,7 +1803,7 @@ function App() {
                       </button>
                     ))
                   ) : (
-                    <p>{market.detail ? marketDetailLabel(market.detail) : statusLabel(market.status)}</p>
+                    <p>{readableText(market.detail ? marketDetailLabel(market.detail) : statusLabel(market.status))}</p>
                   )}
                 </div>
               </section>
@@ -1949,7 +2004,11 @@ function App() {
                   <strong>리스크 요약</strong>
                   <span>{statusLabel(historyRiskState)}</span>
                 </header>
-                <p>{historyRiskChart?.summary ?? "저장된 과거 리스크 분석을 불러오지 못했습니다."}</p>
+                <p>
+                  {readableText(
+                    historyRiskChart?.summary ?? "저장된 과거 리스크 분석을 불러오지 못했습니다.",
+                  )}
+                </p>
                 <div className="evidence-grid">
                   <div>
                     <strong>근거</strong>
@@ -1961,7 +2020,11 @@ function App() {
                   </div>
                   <div>
                     <strong>판단 이유</strong>
-                    <p>{historyRiskChart?.reasoning ?? "불러온 판단 이유가 없습니다."}</p>
+                    <p>
+                      {readableText(
+                        historyRiskChart?.reasoning ?? "불러온 판단 이유가 없습니다.",
+                      )}
+                    </p>
                   </div>
                 </div>
               </section>
@@ -1995,8 +2058,11 @@ function App() {
                           </span>
                         </div>
                         <p>
-                          {event.providerCount}개 공급자와 {event.headlineCount}개 헤드라인이{" "}
-                          {event.eventTags.map(riskTagLabel).join(", ")} 리스크 주제와 일치했습니다.
+                          {readableText(
+                            `${event.providerCount}개 공급자와 ${event.headlineCount}개 헤드라인이 ${event.eventTags
+                              .map(riskTagLabel)
+                              .join(", ")} 리스크 주제와 일치했습니다.`,
+                          )}
                         </p>
                       </article>
                     ))
@@ -2036,6 +2102,32 @@ function App() {
                   disabled={historyState === "loading"}
                 >
                   <Database size={16} />
+                </button>
+              </div>
+            </label>
+            <label>
+              종목명 검색
+              <div className="inline-input-action">
+                <input
+                  value={securityLookupQuery}
+                  placeholder="예: 삼성, 하이닉스, 애플"
+                  onChange={(event) => setSecurityLookupQuery(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") {
+                      event.preventDefault();
+                      void lookupSecurities();
+                    }
+                  }}
+                />
+                <button
+                  type="button"
+                  className="icon-button inline-icon-button"
+                  title="종목명 검색"
+                  aria-label="종목명 검색"
+                  onClick={lookupSecurities}
+                  disabled={securityLookupState === "loading"}
+                >
+                  <Search size={16} />
                 </button>
               </div>
             </label>
@@ -2122,6 +2214,43 @@ function App() {
             </label>
           </div>
 
+          {securityLookupState !== "idle" || securityLookupResults.length ? (
+            <section className="security-lookup-panel">
+              <header>
+                <strong>검색 결과</strong>
+                <span>{securityLookupState === "loading" ? "검색 중" : `${securityLookupResults.length}개`}</span>
+              </header>
+              <div className="security-lookup-list">
+                {securityLookupResults.length ? (
+                  securityLookupResults.map((item) => (
+                    <button
+                      type="button"
+                      className="security-lookup-row"
+                      key={`${item.market}-${item.security_id}-${item.security_db_id}`}
+                      onClick={() => applyLookupSecurityToPreview(item)}
+                      title={`${item.security_name}을 주문 미리보기에 설정`}
+                    >
+                      <strong>{item.security_id}</strong>
+                      <span>{marketLabel(item.market)}</span>
+                      <em>{item.security_name}</em>
+                      <small>
+                        {item.latest_close_price
+                          ? `${formatNumber(item.latest_close_price, 2)}`
+                          : "가격 없음"}
+                      </small>
+                    </button>
+                  ))
+                ) : (
+                  <p>
+                    {securityLookupState === "loading"
+                      ? "종목명을 검색하고 있습니다."
+                      : "일치하는 종목이 없습니다."}
+                  </p>
+                )}
+              </div>
+            </section>
+          ) : null}
+
           <div className="ticket-actions">
             <button
               type="button"
@@ -2203,7 +2332,7 @@ function App() {
                 <span>수익률</span>
                 <strong>{formatPct(investmentProjection.expected_profit_pct)}</strong>
               </div>
-              <p>{investmentProjection.guidance.summary}</p>
+              <p>{readableText(investmentProjection.guidance.summary)}</p>
               <div className="guidance-actions">
                 {investmentProjection.guidance.actions.map((action) => (
                   <span key={action}>{action}</span>
@@ -2337,10 +2466,14 @@ function App() {
                     </strong>
                   </div>
                 </div>
-                <p>{currentPriceRisk.summary}</p>
+                <p>{readableText(currentPriceRisk.summary)}</p>
               </>
             ) : (
-              <p>현재 종목의 저장된 과거 가격 데이터가 있으면 입력 현재가의 이력 기반 리스크를 계산합니다.</p>
+              <p>
+                {readableText(
+                  "현재 종목의 저장된 과거 가격 데이터가 있으면 입력 현재가의 이력 기반 리스크를 계산합니다.",
+                )}
+              </p>
             )}
           </section>
         </article>
