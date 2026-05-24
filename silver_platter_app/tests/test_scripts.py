@@ -304,3 +304,37 @@ class ScriptHelperTests(TestCase):
             payload = output.read_text(encoding="utf-8")
             self.assertIn('"requirement_id": "web_health"', payload)
             self.assertIn('"status": "pass"', payload)
+
+    def test_collect_verification_evidence_loads_local_env(self):
+        script = Path(__file__).resolve().parents[1] / "scripts" / "collect_verification_evidence"
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "scripts").mkdir()
+            shutil.copyfile(
+                Path(__file__).resolve().parents[1] / "scripts" / "load_local_env",
+                root / "scripts" / "load_local_env",
+            )
+            wrapper = root / "scripts" / "collect_verification_evidence"
+            wrapper.write_text(script.read_text(encoding="utf-8"), encoding="utf-8")
+            wrapper.chmod(0o755)
+            web_index = root / "index.html"
+            web_index.write_text("<html>ok</html>", encoding="utf-8")
+            output = root / "evidence.json"
+            (root / ".env").write_text("WEB_URL=%s\n" % web_index.as_uri(), encoding="utf-8")
+
+            subprocess.run(
+                [
+                    "scripts/collect_verification_evidence",
+                    "--skip-check",
+                    "--no-backup",
+                    "--output",
+                    str(output),
+                ],
+                cwd=root,
+                env={**os.environ, "PYTHONPATH": str(Path(__file__).resolve().parents[1] / "src")},
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertIn('"requirement_id": "web_health"', output.read_text(encoding="utf-8"))
