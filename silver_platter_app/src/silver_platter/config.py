@@ -102,7 +102,10 @@ class AppSettings:
             app_timezone=os.getenv("APP_TIMEZONE", "Asia/Seoul"),
             goldilocks=GoldilocksSettings(
                 host=os.getenv("GOLDILOCKS_HOST", "host.docker.internal"),
-                port=_int_from_env("GOLDILOCKS_PORT", 22581),
+                port=_int_from_env(
+                    "GOLDILOCKS_PORT",
+                    _int_from_env("GOLDILOCKS_LISTEN_PORT", 22581),
+                ),
                 database=os.getenv("GOLDILOCKS_DATABASE", "GOLDILOCKS"),
                 schema=os.getenv("GOLDILOCKS_SCHEMA", "SP"),
                 user=os.getenv("GOLDILOCKS_USER", "sp_app"),

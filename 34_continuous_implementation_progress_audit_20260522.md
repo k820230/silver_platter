@@ -211,6 +211,7 @@
 - scheduler timezone 로그 확인: `timezone=Asia/Seoul`
 - compose 대상 API smoke: `API_URL=http://localhost:8000 ./scripts/smoke_api`
 - compose 대상 Web UI 확인: `curl -I http://localhost:3000` -> `200 OK`
+- compose API `/health` Goldilocks TCP check: `ok`, `host.docker.internal:11100`
 - `./scripts/migrate plan`
 - `./scripts/migrate apply --dry-run`
 - `./scripts/goldilocks_odbc_smoke` skip 확인: ODBC 설정 없음
@@ -257,7 +258,7 @@
 
 - Goldilocks ODBC 설정 후 실제 인스턴스 대상 migration apply smoke
 - Goldilocks ODBC smoke는 script 준비 완료, 현재 환경은 ODBC 설정 없음
-- compose API `/health`의 Goldilocks TCP check는 `host.docker.internal:22581` connection refused
+- Goldilocks TCP health는 compose dev 환경에서 `host.docker.internal:11100`으로 확인 완료
 - KRX Data Marketplace daily price smoke는 script 준비 완료, 현재 환경은 opt-in disabled
 - SEC EDGAR network smoke는 script 준비 완료, 현재 환경은 placeholder User-Agent
 - OpenDART network smoke는 script 준비 완료, 현재 환경은 API key 없음

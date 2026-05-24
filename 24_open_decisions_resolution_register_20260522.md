@@ -109,7 +109,7 @@
 | U-014 | 유사 사례 산정 방식 | 공시유형 40%, 규모/수치 surprise 25%, 종목/그룹 유사도 20%, 시장국면/변동성 15%; 최소 20건, 5~19건은 degraded | mvp_default |
 | U-015 | 한국투자증권 실주문 상품/시간 | 현금계좌 국내/미국 상장 주식과 ETF만 MVP live 대상, margin/short/파생 제외, API orderable 상태가 true인 시간만 허용 | mvp_default |
 | U-016 | kill switch 시 기존 open order 취소 | 기본은 신규 주문 차단만 수행, 별도 `cancel_open_orders=true` 수동 명령에서만 미체결 주문 일괄 취소 | mvp_default |
-| U-017 | Goldilocks host/port | `host.docker.internal:22581`, DB `GOLDILOCKS`, schema `SP`, app user `sp_app` | mvp_default |
+| U-017 | Goldilocks host/port | compose dev runtime `host.docker.internal:11100`; `GOLDILOCKS_PORT` override supported, DB `GOLDILOCKS`, schema `SP`, app user `sp_app` | mvp_default |
 | U-018 | Web/API framework | API FastAPI, worker Python, Web React + Vite + TypeScript | mvp_default |
 | U-019 | queue/event bus | Redis Streams를 event bus로 사용하고 RQ를 background job queue로 사용 | mvp_default |
 | U-020 | scheduler | APScheduler, timezone `Asia/Seoul` | mvp_default |

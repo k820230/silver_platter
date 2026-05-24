@@ -1,12 +1,14 @@
 import os
 import unittest
+from unittest.mock import patch
 
 from silver_platter.config import AppSettings
 
 
 class ConfigTest(unittest.TestCase):
     def test_defaults_are_mvp_values(self):
-        settings = AppSettings.from_env()
+        with patch.dict(os.environ, {}, clear=True):
+            settings = AppSettings.from_env()
         self.assertEqual(settings.app_timezone, "Asia/Seoul")
         self.assertEqual(settings.goldilocks.host, "host.docker.internal")
         self.assertEqual(settings.goldilocks.port, 22581)
@@ -23,15 +25,12 @@ class ConfigTest(unittest.TestCase):
         self.assertFalse(settings.simulation_order_broker_send)
 
     def test_env_override(self):
-        old = os.environ.get("GOLDILOCKS_PORT")
-        os.environ["GOLDILOCKS_PORT"] = "22582"
-        try:
+        with patch.dict(os.environ, {"GOLDILOCKS_PORT": "22582"}, clear=True):
             self.assertEqual(AppSettings.from_env().goldilocks.port, 22582)
-        finally:
-            if old is None:
-                os.environ.pop("GOLDILOCKS_PORT", None)
-            else:
-                os.environ["GOLDILOCKS_PORT"] = old
+
+    def test_goldilocks_listen_port_fallback(self):
+        with patch.dict(os.environ, {"GOLDILOCKS_LISTEN_PORT": "11100"}, clear=True):
+            self.assertEqual(AppSettings.from_env().goldilocks.port, 11100)
 
 
 if __name__ == "__main__":

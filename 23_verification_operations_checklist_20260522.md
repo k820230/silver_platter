@@ -83,7 +83,7 @@
 | --- | --- |
 | Docker Compose dev profile 기동 | [x] |
 | PostgreSQL 서비스 없음 | [x] |
-| Goldilocks 연결 성공 | [ ] |
+| Goldilocks 연결 성공 | [x] |
 | Redis 연결 성공 | [x] |
 | API `/health` 정상 | [x] |
 | Web UI 접속 가능 | [x] |

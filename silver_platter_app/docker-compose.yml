@@ -16,6 +16,8 @@ services:
       context: .
       dockerfile: docker/api.Dockerfile
     env_file: .env.example
+    environment:
+      GOLDILOCKS_PORT: ${GOLDILOCKS_PORT:-11100}
     ports:
       - "8000:8000"
     extra_hosts:
@@ -29,6 +31,8 @@ services:
       dockerfile: docker/worker.Dockerfile
     command: ["python", "-m", "silver_platter.worker.main"]
     env_file: .env.example
+    environment:
+      GOLDILOCKS_PORT: ${GOLDILOCKS_PORT:-11100}
     extra_hosts:
       - "host.docker.internal:host-gateway"
     depends_on:
@@ -40,6 +44,8 @@ services:
       dockerfile: docker/worker.Dockerfile
     command: ["python", "-m", "silver_platter.worker.scheduler"]
     env_file: .env.example
+    environment:
+      GOLDILOCKS_PORT: ${GOLDILOCKS_PORT:-11100}
     extra_hosts:
       - "host.docker.internal:host-gateway"
     depends_on:
