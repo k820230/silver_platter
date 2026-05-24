@@ -99,7 +99,7 @@ APP_ENV=development
 APP_TIMEZONE=Asia/Seoul
 
 GOLDILOCKS_HOST=host.docker.internal
-GOLDILOCKS_PORT=22581
+GOLDILOCKS_PORT=11100
 GOLDILOCKS_DATABASE=GOLDILOCKS
 GOLDILOCKS_USER=
 GOLDILOCKS_PASSWORD=
@@ -303,7 +303,7 @@ backup-runner는 Goldilocks 백업 명령을 실행하고 결과를 `db_backup_r
 
 ## 17. 구현 기본 결정 사항
 
-1. Goldilocks listener 기본값은 `host.docker.internal:22581`이다.
+1. Goldilocks compose dev listener 기본값은 `host.docker.internal:11100`이다.
 2. backup 명령은 `scripts/goldilocks_backup.sh` wrapper가 Goldilocks native online backup을 호출한다.
 3. API는 FastAPI, worker는 Python, Web은 React + Vite + TypeScript로 시작한다.
 4. application log 보존 기간은 180일, audit log는 DB에 영구 보존한다.

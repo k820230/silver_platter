@@ -184,13 +184,12 @@ MVP catalog에는 다음 source가 포함된다.
 
 이번 작업은 adapter contract와 local pipeline foundation이다. 다음 항목은 실제 provider별 API credential, rate limit, 데이터 포맷 확인 후 연결한다.
 
-- KRX Data Marketplace daily price network smoke는 script 준비 완료, 현재 환경은 opt-in disabled
+- KRX Data Marketplace daily price network smoke는 opt-in 실행 시 KRX portal OTP가 `LOGOUT`을 반환해 blocked
 - OpenDART network smoke는 script 준비 완료, 현재 환경은 API key 없음
-- KRX KIND network smoke는 script 준비 완료, 현재 환경은 opt-in disabled
+- KRX KIND network smoke 완료
 - SEC EDGAR network smoke는 script 준비 완료, 현재 환경은 placeholder User-Agent라 skip
 - ECOS FX network smoke는 script 준비 완료, 현재 환경은 API key 없음
-- Goldilocks 실제 ODBC connection 대상 writer smoke
-  - `scripts/goldilocks_repository_smoke` 준비 완료, 기본은 rollback-only smoke opt-in 전 skip
+- Goldilocks 실제 ODBC connection 대상 writer smoke 완료
 - parquet dependency 선택과 운영 이미지 반영
 
 ## 6. 검증 명령
