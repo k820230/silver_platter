@@ -2,6 +2,7 @@
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
+. scripts/load_local_env
 
 if [ "${GOLDILOCKS_REPOSITORY_SMOKE_WRITE:-0}" != "1" ]; then
   echo "Goldilocks repository smoke skipped: set GOLDILOCKS_REPOSITORY_SMOKE_WRITE=1 to run rollback-only writer checks"
