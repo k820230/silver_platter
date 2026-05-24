@@ -377,6 +377,49 @@ class BackupTests(TestCase):
         self.assertEqual("ok", status.restore_status)
         self.assertEqual(str(manifest_path), status.latest_manifest_path)
 
+    def test_backup_restore_status_includes_restore_drill_evidence(self):
+        with TemporaryDirectory() as tmp:
+            base = Path(tmp)
+            data_file = base / "goldilocks" / "data" / "part.dat"
+            data_file.parent.mkdir(parents=True)
+            data_file.write_text("payload", encoding="utf-8")
+            manifest_path = base / "manifest.json"
+            write_backup_manifest(
+                build_backup_manifest(base, date(2026, 5, 23)),
+                manifest_path,
+            )
+            evidence_path = base / ".restore_drill_runs" / "2026-06-01.json"
+            evidence_path.parent.mkdir(parents=True)
+            evidence_path.write_text(
+                json.dumps(
+                    {
+                        "scheduled_at": "2026-06-01T11:00:00+09:00",
+                        "completed_at": "2026-06-01T11:02:00+09:00",
+                        "status": "ok",
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            status = summarize_backup_restore_status(base)
+
+        self.assertEqual(str(evidence_path), status.latest_restore_drill_path)
+        self.assertEqual("ok", status.restore_drill_status)
+        self.assertEqual("2026-06-01T11:02:00+09:00", status.restore_drill_checked_at)
+
+    def test_backup_restore_status_reports_invalid_restore_drill_evidence(self):
+        with TemporaryDirectory() as tmp:
+            base = Path(tmp)
+            evidence_path = base / ".restore_drill_runs" / "2026-06-01.json"
+            evidence_path.parent.mkdir(parents=True)
+            evidence_path.write_text("{not-json", encoding="utf-8")
+
+            status = summarize_backup_restore_status(base)
+
+        self.assertEqual(str(evidence_path), status.latest_restore_drill_path)
+        self.assertEqual("invalid", status.restore_drill_status)
+        self.assertIsNone(status.restore_drill_checked_at)
+
     def test_latest_manifest_ignores_in_progress_backup_manifest(self):
         with TemporaryDirectory() as tmp:
             base = Path(tmp)

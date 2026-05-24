@@ -68,6 +68,7 @@
 - restore check
 - restore check repository writer
 - backup/restore status summary
+- backup/restore status에 latest restore drill evidence summary 포함
 - 파일 누락, 크기 불일치, checksum mismatch 검출
 
 ### 3.4 Backup/restore scheduler helper
@@ -140,6 +141,8 @@
 - stale backup degraded 판정
 - missing backup date degraded 판정
 - invalid backup date degraded 판정
+- latest restore drill evidence summary 노출
+- invalid restore drill evidence summary 노출
 - restore check 성공
 - manifest checksum match 성공 검증
 - manifest checksum mismatch 실패 검출

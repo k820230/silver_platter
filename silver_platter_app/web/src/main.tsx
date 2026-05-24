@@ -151,6 +151,9 @@ type BackupStatusResponse = {
   latest_backup_date: string | null;
   backup_status: string;
   restore_status: string;
+  latest_restore_drill_path: string | null;
+  restore_drill_status: string;
+  restore_drill_checked_at: string | null;
   lock_held: boolean;
   issue_count: number;
   issues: string[];
@@ -340,9 +343,13 @@ function backupStatusDetail(status: BackupStatusResponse): string {
     ? [
         `backup ${status.backup_status}`,
         `restore ${status.restore_status}`,
+        `drill ${status.restore_drill_status}`,
         `date ${status.latest_backup_date}`,
       ]
-    : ["no backup manifest"];
+    : ["no backup manifest", `drill ${status.restore_drill_status}`];
+  if (status.restore_drill_checked_at) {
+    parts.push(`drill checked ${status.restore_drill_checked_at}`);
+  }
   if (status.lock_held) {
     parts.push("lock held");
   }

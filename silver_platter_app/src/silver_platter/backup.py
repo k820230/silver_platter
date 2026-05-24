@@ -53,6 +53,9 @@ class BackupRestoreStatus:
     latest_backup_date: Optional[str]
     backup_status: str
     restore_status: str
+    latest_restore_drill_path: Optional[str]
+    restore_drill_status: str
+    restore_drill_checked_at: Optional[str]
     lock_held: bool
     checked_at: datetime
     issue_count: int
@@ -66,6 +69,9 @@ class BackupRestoreStatus:
             "latest_backup_date": self.latest_backup_date,
             "backup_status": self.backup_status,
             "restore_status": self.restore_status,
+            "latest_restore_drill_path": self.latest_restore_drill_path,
+            "restore_drill_status": self.restore_drill_status,
+            "restore_drill_checked_at": self.restore_drill_checked_at,
             "lock_held": self.lock_held,
             "checked_at": self.checked_at.isoformat(),
             "issue_count": self.issue_count,
@@ -206,6 +212,46 @@ def find_latest_backup_manifest(base_path: Path) -> Optional[Path]:
     return manifests[-1] if manifests else None
 
 
+def _restore_drill_sort_key(path: Path) -> tuple:
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+        if not isinstance(payload, dict):
+            return "", "", str(path)
+        scheduled_at = str(payload.get("scheduled_at", ""))
+        completed_at = str(payload.get("completed_at", ""))
+        return scheduled_at, completed_at, str(path)
+    except (OSError, json.JSONDecodeError):
+        return "", "", str(path)
+
+
+def find_latest_restore_drill_evidence(base_path: Path) -> Optional[Path]:
+    evidence_dir = base_path / ".restore_drill_runs"
+    if not evidence_dir.exists():
+        return None
+    evidence_files = sorted(evidence_dir.glob("*.json"), key=_restore_drill_sort_key)
+    return evidence_files[-1] if evidence_files else None
+
+
+def _latest_restore_drill_summary(
+    backup_base_dir: Path,
+) -> Tuple[Optional[str], str, Optional[str]]:
+    evidence_path = find_latest_restore_drill_evidence(backup_base_dir)
+    if evidence_path is None:
+        return None, "missing", None
+    try:
+        payload = json.loads(evidence_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return str(evidence_path), "invalid", None
+    if not isinstance(payload, dict):
+        return str(evidence_path), "invalid", None
+    completed_at = payload.get("completed_at")
+    return (
+        str(evidence_path),
+        str(payload.get("status", "unknown")),
+        str(completed_at) if completed_at else None,
+    )
+
+
 def _read_manifest_payload(manifest_path: Path) -> Tuple[Optional[Dict[str, object]], List[str]]:
     try:
         payload = json.loads(manifest_path.read_text(encoding="utf-8"))
@@ -301,6 +347,9 @@ def summarize_backup_restore_status(
     lock_target = lock_path or (backup_base_dir / ".goldilocks_backup.lock")
     lock_held = lock_target.exists()
     issues: List[str] = []
+    restore_drill_path, restore_drill_status, restore_drill_checked_at = (
+        _latest_restore_drill_summary(backup_base_dir)
+    )
     latest_manifest = find_latest_backup_manifest(backup_base_dir)
     if latest_manifest is None:
         issues.append("backup manifest is missing")
@@ -311,6 +360,9 @@ def summarize_backup_restore_status(
             latest_backup_date=None,
             backup_status="missing",
             restore_status="not_checked",
+            latest_restore_drill_path=restore_drill_path,
+            restore_drill_status=restore_drill_status,
+            restore_drill_checked_at=restore_drill_checked_at,
             lock_held=lock_held,
             checked_at=checked,
             issue_count=len(issues),
@@ -356,6 +408,9 @@ def summarize_backup_restore_status(
         latest_backup_date=latest_backup_date,
         backup_status=backup_status,
         restore_status=restore_result.status,
+        latest_restore_drill_path=restore_drill_path,
+        restore_drill_status=restore_drill_status,
+        restore_drill_checked_at=restore_drill_checked_at,
         lock_held=lock_held,
         checked_at=checked,
         issue_count=len(issues),

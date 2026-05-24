@@ -119,6 +119,7 @@
 - backup restore check invalid base path failure
 - backup restore check path escape/directory entry failure
 - backup/restore status summary
+- backup/restore latest restore drill evidence summary
 - stale backup status degradation
 - missing backup date status degradation
 - invalid backup date status degradation
@@ -140,7 +141,7 @@
 - G7 live safety gate evidence
 - migration coverage
 
-현재 테스트 수: 184개
+현재 테스트 수: 186개
 
 ## 7. 검증 증적
 
