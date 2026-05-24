@@ -661,6 +661,46 @@ class GoldilocksRepository:
             ),
         )
 
+    def insert_db_backup_run(
+        self,
+        backup_policy_id: int,
+        scheduled_at: datetime,
+        status: str,
+        started_at: Optional[datetime] = None,
+        completed_at: Optional[datetime] = None,
+        backup_path: Optional[str] = None,
+        total_bytes: Optional[int] = None,
+        checksum_status: Optional[str] = None,
+        error_message: str = "",
+    ) -> None:
+        self._execute(
+            """
+            INSERT INTO SP.db_backup_run (
+                backup_policy_id,
+                scheduled_at,
+                started_at,
+                completed_at,
+                status,
+                backup_path,
+                total_bytes,
+                checksum_status,
+                error_message
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                backup_policy_id,
+                scheduled_at,
+                started_at,
+                completed_at,
+                status,
+                backup_path,
+                total_bytes,
+                checksum_status,
+                error_message,
+            ),
+        )
+
     def insert_gate_assessment(
         self,
         assessment: GateAssessment,

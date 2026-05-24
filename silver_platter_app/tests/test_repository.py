@@ -354,6 +354,24 @@ class RepositoryTests(TestCase):
         self.assertEqual((77, "/backup/manifest.json", checked_at, "failed", 1), params[:5])
         self.assertEqual('["checksum mismatch: part.dat"]', params[5])
 
+    def test_insert_db_backup_run(self):
+        connection = FakeConnection()
+        repository = GoldilocksRepository(connection)
+
+        repository.insert_db_backup_run(
+            backup_policy_id=7,
+            scheduled_at=datetime(2026, 5, 23, 10, 0, 0),
+            started_at=datetime(2026, 5, 23, 10, 0, 1),
+            completed_at=datetime(2026, 5, 23, 10, 1, 0),
+            status="success",
+            backup_path="/backup/2026-05-23",
+            total_bytes=1024,
+            checksum_status="ok",
+        )
+
+        self.assertIn("SP.db_backup_run", connection.commands[0][0])
+        self.assertEqual((7, datetime(2026, 5, 23, 10, 0, 0)), connection.commands[0][1][:2])
+
     def test_insert_verification_gate_assessment_and_evidence(self):
         evidence = [
             GateEvidence("api_health", "pass", "GET /health", datetime(2026, 5, 22)),

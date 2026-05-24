@@ -6,6 +6,7 @@ import urllib.request
 from typing import Callable, Dict, Iterable, List, Optional
 
 from silver_platter.audit import AuditLog
+from silver_platter.backup import BackupRestoreStatus
 from silver_platter.headlines import RealtimeAlert
 from silver_platter.operations import OperationsSummary
 
@@ -170,6 +171,29 @@ def build_realtime_alert_message(
         metadata={
             "event_tags": ",".join(alert.event_tags),
             "volume_increase_pct": str(alert.volume_increase_pct),
+        },
+    )
+
+
+def build_backup_failure_alert_message(
+    status: BackupRestoreStatus,
+    channel: str = "operations",
+) -> Optional[AlertDeliveryMessage]:
+    if status.status == "ok" and status.restore_status == "ok":
+        return None
+    return AlertDeliveryMessage(
+        alert_id="backup-%s" % status.checked_at.isoformat(),
+        channel=channel,
+        severity="critical" if status.status == "critical" else "warning",
+        title="backup status is %s" % status.status,
+        body="; ".join(status.issues) or "backup or restore status requires attention",
+        created_at=status.checked_at,
+        metadata={
+            "component": "backup_restore",
+            "status": status.status,
+            "backup_status": status.backup_status,
+            "restore_status": status.restore_status,
+            "issue_count": str(status.issue_count),
         },
     )
 

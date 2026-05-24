@@ -67,9 +67,11 @@
 - manifest 파일 쓰기
 - backup execution lock과 중복 실행 방지
 - restore check
+- `db_backup_run` repository writer
 - restore check repository writer
 - backup/restore status summary
 - backup/restore status에 latest restore drill evidence summary 포함
+- backup failure alert message 생성
 - 파일 누락, 크기 불일치, checksum mismatch 검출
 
 ### 3.4 Backup/restore scheduler helper
@@ -122,6 +124,8 @@
 - backtest repository SQL generation
 - scenario result repository SQL generation
 - restore check repository SQL generation
+- db_backup_run repository SQL generation
+- backup failure alert message 생성
 - backup manifest 생성
 - backup manifest/checksum self-file exclusion
 - backup manifest final base path recording for staging writes

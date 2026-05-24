@@ -4,11 +4,13 @@ from unittest import TestCase
 from silver_platter.alerts import (
     InMemoryAlertDeliveryProvider,
     WebhookAlertDeliveryProvider,
+    build_backup_failure_alert_message,
     build_operations_alert_messages,
     build_realtime_alert_message,
     dispatch_alerts,
 )
 from silver_platter.audit import AuditLog
+from silver_platter.backup import BackupRestoreStatus
 from silver_platter.headlines import RealtimeAlert
 from silver_platter.operations import ComponentStatus, summarize_operations
 
@@ -84,3 +86,28 @@ class AlertsTests(TestCase):
         self.assertEqual("delivered", result.status)
         self.assertEqual("https://alerts.example.test", calls[0][0])
         self.assertEqual("ops-api-2026-05-22T09:00:00", calls[0][2]["alert_id"])
+
+    def test_build_backup_failure_alert_message(self):
+        checked_at = datetime(2026, 5, 22, 9, 0, 0)
+        message = build_backup_failure_alert_message(
+            BackupRestoreStatus(
+                status="critical",
+                backup_base_dir="/backup",
+                latest_manifest_path="/backup/manifest.json",
+                latest_backup_date="2026-05-22",
+                backup_status="success",
+                restore_status="failed",
+                latest_restore_drill_path=None,
+                restore_drill_status="missing",
+                restore_drill_checked_at=None,
+                lock_held=False,
+                checked_at=checked_at,
+                issue_count=1,
+                issues=["checksum mismatch"],
+            )
+        )
+
+        self.assertIsNotNone(message)
+        self.assertEqual("critical", message.severity)
+        self.assertEqual("backup_restore", message.metadata["component"])
+        self.assertIn("checksum mismatch", message.body)

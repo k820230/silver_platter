@@ -130,6 +130,8 @@
 - backup manifest/checksum self-file exclusion
 - backup manifest staging final-base-path recording
 - backup manifest checksum path-stable hash validation
+- db_backup_run repository writer
+- backup failure alert message
 - in-progress backup manifest ignored by status discovery
 - nested backup content manifest ignored by status discovery
 - backup restore check manifest checksum validation
@@ -175,7 +177,7 @@
 - verification status UI card
 - migration coverage
 
-현재 테스트 수: 214개
+현재 테스트 수: 216개
 
 ## 7. 검증 증적
 
