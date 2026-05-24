@@ -100,6 +100,7 @@ class ScriptHelperTests(TestCase):
             self.assertIn("blocked: ECOS API key", result.stdout)
             self.assertIn("skipped: alert webhook URL", result.stdout)
             self.assertIn("blocked: Goldilocks ODBC history prefetch storage", result.stdout)
+            self.assertIn("blocked: G7 approval evidence", result.stdout)
             self.assertIn("external smoke readiness blocked", result.stdout)
 
     def test_external_smoke_readiness_loads_env_and_reports_ready(self):
@@ -108,6 +109,8 @@ class ScriptHelperTests(TestCase):
             self._copy_readiness_scripts(root)
             snapshot = root / "snapshot.jsonl"
             snapshot.write_text("{}", encoding="utf-8")
+            g7_evidence = root / "g7-evidence.json"
+            g7_evidence.write_text("{}", encoding="utf-8")
             (root / ".env").write_text(
                 "\n".join(
                     [
@@ -118,6 +121,7 @@ class ScriptHelperTests(TestCase):
                         "GOLDILOCKS_ODBC_DSN=sp_test",
                         "KRX_PRICE_SMOKE_ENABLED=1",
                         "LONG_REPLAY_SNAPSHOT_PATH=%s" % snapshot,
+                        "G7_APPROVAL_EVIDENCE_PATH=%s" % g7_evidence,
                         "G7_LIVE_SMOKE_APPROVED=1",
                     ]
                 ),
@@ -140,6 +144,7 @@ class ScriptHelperTests(TestCase):
             self.assertIn("ready: Goldilocks ODBC history prefetch storage", result.stdout)
             self.assertIn("ready: KRX price smoke opt-in", result.stdout)
             self.assertIn("ready: long replay snapshot", result.stdout)
+            self.assertIn("ready: G7 approval evidence", result.stdout)
             self.assertIn("ready: G7 live/paper smoke approval", result.stdout)
             self.assertIn("external smoke readiness passed", result.stdout)
 

@@ -68,6 +68,13 @@ else
   block "long replay snapshot" "set LONG_REPLAY_SNAPSHOT_PATH to an existing snapshot file or directory"
 fi
 
+g7_evidence_path="${G7_APPROVAL_EVIDENCE_PATH:-var/verification/g7-approval-evidence.json}"
+if [ -e "${g7_evidence_path}" ]; then
+  ready "G7 approval evidence"
+else
+  block "G7 approval evidence" "run ./scripts/collect_g7_approval_evidence before manual approval"
+fi
+
 if [ "${G7_LIVE_SMOKE_APPROVED:-0}" = "1" ]; then
   ready "G7 live/paper smoke approval"
 else
