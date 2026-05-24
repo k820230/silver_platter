@@ -66,7 +66,7 @@ npm --prefix web install
 npm --prefix web run build
 ```
 
-For local secrets, create an untracked `.env`. The guarded smoke scripts load simple `KEY=VALUE` entries from `.env`; Docker Compose still needs `docker-compose --env-file .env ...` or host environment variables.
+For local secrets, create an untracked `.env`. The guarded smoke scripts load simple `KEY=VALUE` entries from `.env`, and Docker Compose reads the same file for variable substitution before applying the tracked `.env.example` defaults.
 `./scripts/migrate apply` requires a Goldilocks ODBC configuration via `GOLDILOCKS_ODBC_CONNECT_STRING`, `GOLDILOCKS_ODBC_DSN`, or `GOLDILOCKS_ODBC_DRIVER`.
 Set `WATCHLIST_STORE_PATH` to persist API watchlist changes to a local JSON file; leave it empty for in-memory development mode.
 `./scripts/goldilocks_odbc_smoke` is read-only and skips unless Goldilocks ODBC is configured.
