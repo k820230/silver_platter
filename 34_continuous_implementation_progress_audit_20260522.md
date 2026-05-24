@@ -154,10 +154,12 @@
 - G7 live safety gate evidence
 - script result gate evidence conversion
 - backup status G8 evidence conversion
+- verification evidence bundle JSON persistence
+- verification evidence collection script
 - verification status UI card
 - migration coverage
 
-현재 테스트 수: 202개
+현재 테스트 수: 203개
 
 ## 7. 검증 증적
 
@@ -173,6 +175,7 @@
 - `./scripts/smoke_api`
 - `./scripts/scheduler_smoke`
 - `./scripts/guarded_smoke`
+- `./scripts/collect_verification_evidence --skip-check --backup-base-dir /tmp/silver-platter-missing-backup --output /tmp/silver-platter-evidence-bundle.json`
 - `./scripts/migrate plan`
 - `./scripts/migrate apply --dry-run`
 - `./scripts/goldilocks_odbc_smoke` skip 확인: ODBC 설정 없음

@@ -1,5 +1,7 @@
 from dataclasses import dataclass, field
 from datetime import datetime
+import json
+from pathlib import Path
 from typing import Dict, Iterable, List, Optional, Tuple
 
 from silver_platter.backtest import PaperReplayEvidence
@@ -52,6 +54,20 @@ class GateAssessment:
         }
 
 
+@dataclass(frozen=True)
+class VerificationEvidenceBundle:
+    generated_at: datetime
+    evidence: Tuple[GateEvidence, ...]
+    assessments: Tuple[GateAssessment, ...]
+
+    def as_dict(self) -> dict:
+        return {
+            "generated_at": self.generated_at.isoformat(),
+            "evidence": [gate_evidence_as_dict(item) for item in self.evidence],
+            "assessments": [item.as_dict() for item in self.assessments],
+        }
+
+
 DEFAULT_GATE_REQUIREMENTS: Tuple[GateRequirement, ...] = (
     GateRequirement("G2", "api_health", "API health responds", "GET /health"),
     GateRequirement("G2", "web_health", "Web UI responds", "GET /"),
@@ -68,6 +84,16 @@ DEFAULT_GATE_REQUIREMENTS: Tuple[GateRequirement, ...] = (
     GateRequirement("G7", "reconciliation_passed", "Broker/internal reconciliation passes", "tests/test_accounting_posting.py"),
     GateRequirement("G8", "backup_manifest", "Backup manifest is restorable", "tests/test_backup.py"),
 )
+
+
+def gate_evidence_as_dict(evidence: GateEvidence) -> dict:
+    return {
+        "requirement_id": evidence.requirement_id,
+        "status": evidence.status,
+        "evidence_uri": evidence.evidence_uri,
+        "checked_at": evidence.checked_at.isoformat(),
+        "detail": evidence.detail,
+    }
 
 
 def assess_gate(
@@ -107,6 +133,52 @@ def assess_gate(
         missing_requirements=tuple(missing),
         failed_evidence=tuple(failed),
     )
+
+
+def build_verification_evidence_bundle(
+    evidence: Iterable[GateEvidence],
+    gate_ids: Optional[Iterable[str]] = None,
+    requirements: Iterable[GateRequirement] = DEFAULT_GATE_REQUIREMENTS,
+    generated_at: Optional[datetime] = None,
+) -> VerificationEvidenceBundle:
+    requirement_catalog = tuple(requirements)
+    collected_evidence = tuple(evidence)
+    if gate_ids is None:
+        requirement_to_gate = {
+            requirement.requirement_id: requirement.gate_id
+            for requirement in requirement_catalog
+        }
+        selected_gate_ids = tuple(
+            sorted(
+                {
+                    requirement_to_gate[item.requirement_id]
+                    for item in collected_evidence
+                    if item.requirement_id in requirement_to_gate
+                }
+            )
+        )
+    else:
+        selected_gate_ids = tuple(gate_ids)
+    return VerificationEvidenceBundle(
+        generated_at=generated_at or datetime.utcnow(),
+        evidence=collected_evidence,
+        assessments=tuple(
+            assess_gate(gate_id, requirement_catalog, collected_evidence)
+            for gate_id in selected_gate_ids
+        ),
+    )
+
+
+def write_verification_evidence_bundle(
+    bundle: VerificationEvidenceBundle,
+    path: Path,
+) -> Path:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        json.dumps(bundle.as_dict(), ensure_ascii=True, sort_keys=True, indent=2),
+        encoding="utf-8",
+    )
+    return path
 
 
 def paper_replay_to_gate_evidence(

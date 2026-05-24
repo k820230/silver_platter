@@ -1,4 +1,7 @@
 from datetime import datetime
+import json
+from pathlib import Path
+from tempfile import TemporaryDirectory
 from unittest import TestCase
 
 from silver_platter.backtest import PaperReplayEvidence
@@ -8,9 +11,11 @@ from silver_platter.verification import (
     GateEvidence,
     assess_gate,
     backup_status_to_gate_evidence,
+    build_verification_evidence_bundle,
     live_safety_to_gate_evidence,
     paper_replay_to_gate_evidence,
     script_result_to_gate_evidence,
+    write_verification_evidence_bundle,
 )
 
 
@@ -119,6 +124,30 @@ class VerificationTests(TestCase):
         self.assertEqual("fail", failed.status)
         self.assertEqual("script:scripts/check", passed.evidence_uri)
         self.assertIn("exit_code=1", failed.detail)
+
+    def test_verification_evidence_bundle_writes_assessments(self):
+        checked_at = datetime(2026, 5, 22, 12, 0, 0)
+        evidence = [
+            GateEvidence("api_health", "pass", "GET /health", checked_at),
+            GateEvidence("web_health", "pass", "GET /", checked_at),
+            GateEvidence("compose_config", "pass", "docker compose config", checked_at),
+        ]
+        bundle = build_verification_evidence_bundle(
+            evidence,
+            gate_ids=("G2",),
+            generated_at=checked_at,
+        )
+
+        with TemporaryDirectory() as tmp:
+            path = write_verification_evidence_bundle(
+                bundle,
+                Path(tmp) / "evidence.json",
+            )
+            payload = json.loads(path.read_text(encoding="utf-8"))
+
+        self.assertEqual("pass", bundle.assessments[0].status)
+        self.assertEqual("G2", payload["assessments"][0]["gate_id"])
+        self.assertEqual("compose_config", payload["evidence"][2]["requirement_id"])
 
     def test_backup_status_to_gate_evidence_passes_restorable_backup(self):
         checked_at = datetime(2026, 5, 22, 9, 0, 0)

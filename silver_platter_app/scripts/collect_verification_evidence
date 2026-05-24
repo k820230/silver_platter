@@ -1,0 +1,150 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+cd "$(dirname "$0")/.."
+
+PYTHONPATH=src python3 - "$@" <<'PY'
+import argparse
+from datetime import datetime
+import os
+from pathlib import Path
+import subprocess
+import sys
+
+from silver_platter.backup import summarize_backup_restore_status
+from silver_platter.verification import DEFAULT_GATE_REQUIREMENTS
+from silver_platter.verification import (
+    backup_status_to_gate_evidence,
+    build_verification_evidence_bundle,
+    script_result_to_gate_evidence,
+    write_verification_evidence_bundle,
+)
+
+
+def _run_command(command):
+    return subprocess.run(
+        command,
+        capture_output=True,
+        text=True,
+    )
+
+
+def _combined_output(result):
+    return "\n".join(part for part in [result.stdout, result.stderr] if part)
+
+
+def main(argv):
+    parser = argparse.ArgumentParser(
+        description="Collect local verification outputs into a gate evidence bundle."
+    )
+    parser.add_argument(
+        "--output",
+        default=os.getenv(
+            "VERIFICATION_EVIDENCE_PATH",
+            "var/verification/evidence-bundle.json",
+        ),
+    )
+    parser.add_argument("--skip-check", action="store_true")
+    parser.add_argument("--run-smoke-api", action="store_true")
+    parser.add_argument("--no-backup", action="store_true")
+    parser.add_argument("--write-goldilocks", action="store_true")
+    parser.add_argument(
+        "--backup-base-dir",
+        default=os.getenv("BACKUP_BASE_DIR", "/home/jhkim5/backup_sp"),
+    )
+    parser.add_argument(
+        "--max-backup-age-days",
+        type=int,
+        default=int(os.getenv("MAX_BACKUP_AGE_DAYS", "8")),
+    )
+    parser.add_argument("--fail-on-blocked", action="store_true")
+    args = parser.parse_args(argv)
+
+    checked_at = datetime.utcnow()
+    evidence = []
+    gate_ids = []
+    command_failed = False
+
+    if not args.skip_check:
+        result = _run_command(["./scripts/check"])
+        evidence.append(
+            script_result_to_gate_evidence(
+                "compose_config",
+                "scripts/check",
+                result.returncode,
+                checked_at,
+                _combined_output(result),
+            )
+        )
+        gate_ids.append("G2")
+        command_failed = command_failed or result.returncode != 0
+
+    if args.run_smoke_api:
+        result = _run_command(["./scripts/smoke_api"])
+        evidence.append(
+            script_result_to_gate_evidence(
+                "api_health",
+                "scripts/smoke_api",
+                result.returncode,
+                checked_at,
+                _combined_output(result),
+            )
+        )
+        gate_ids.append("G2")
+        command_failed = command_failed or result.returncode != 0
+
+    if not args.no_backup:
+        backup_status = summarize_backup_restore_status(
+            Path(args.backup_base_dir),
+            max_backup_age_days=args.max_backup_age_days,
+            checked_at=checked_at,
+        )
+        evidence.append(backup_status_to_gate_evidence(backup_status, checked_at))
+        gate_ids.append("G8")
+
+    bundle = build_verification_evidence_bundle(
+        evidence,
+        gate_ids=tuple(dict.fromkeys(gate_ids)),
+        generated_at=checked_at,
+    )
+    output_path = write_verification_evidence_bundle(bundle, Path(args.output))
+    if args.write_goldilocks:
+        from silver_platter.migrations import connect_goldilocks_from_env
+        from silver_platter.repository import GoldilocksRepository
+
+        requirement_to_gate = {
+            requirement.requirement_id: requirement.gate_id
+            for requirement in DEFAULT_GATE_REQUIREMENTS
+        }
+        repository = GoldilocksRepository(connect_goldilocks_from_env())
+        for assessment in bundle.assessments:
+            repository.insert_gate_assessment(assessment, assessed_at=checked_at)
+        for item in bundle.evidence:
+            gate_id = requirement_to_gate.get(item.requirement_id)
+            if gate_id is not None:
+                repository.insert_gate_evidence(gate_id, item)
+
+    print("verification evidence bundle written: %s" % output_path)
+    for assessment in bundle.assessments:
+        print(
+            "gate=%s status=%s passed=%s/%s"
+            % (
+                assessment.gate_id,
+                assessment.status,
+                assessment.passed_count,
+                assessment.total_count,
+            )
+        )
+
+    if command_failed:
+        return 1
+    if args.fail_on_blocked and any(
+        assessment.status != "pass" for assessment in bundle.assessments
+    ):
+        return 1
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main(sys.argv[1:]))
+PY

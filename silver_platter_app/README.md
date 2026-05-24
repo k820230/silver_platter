@@ -38,6 +38,7 @@ cd /home/jhkim5/silver_platter/silver_platter_app
 ./scripts/smoke_api
 ./scripts/scheduler_smoke
 ./scripts/guarded_smoke
+./scripts/collect_verification_evidence
 ./scripts/migrate status
 ./scripts/migrate render
 ./scripts/migrate plan
@@ -77,6 +78,7 @@ Set `WATCHLIST_STORE_PATH` to persist API watchlist changes to a local JSON file
 `./scripts/ofac_recent_actions_smoke` is read-only and skips unless `OFAC_RECENT_ACTIONS_SMOKE_ENABLED=1` is configured.
 `./scripts/provider_smoke` runs the guarded SEC EDGAR, OpenDART, KRX KIND, KRX price, ECOS FX, official RSS, and OFAC smoke checks.
 `./scripts/alert_webhook_smoke` sends one test alert and skips unless `ALERT_WEBHOOK_URL` is configured.
+`./scripts/collect_verification_evidence` writes a local gate evidence JSON bundle under `var/verification/` by default; use `--run-smoke-api` to include API smoke evidence and `--write-goldilocks` to persist assessments/evidence through the configured Goldilocks repository writer.
 
 ## MVP Defaults
 

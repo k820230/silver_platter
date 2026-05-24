@@ -28,6 +28,9 @@
 - live safety 결과를 G7 gate evidence로 변환
 - script 실행 결과를 gate evidence로 변환
 - backup/restore status를 G8 gate evidence로 변환
+- verification evidence bundle JSON 저장
+- `scripts/check`, optional `scripts/smoke_api`, backup status evidence 자동 수집 script
+- Goldilocks 설정 시 gate assessment/evidence repository 저장 옵션
 - gate assessment/evidence Goldilocks repository SQL generation
 - 운영 UI verification status card
 - API 응답용 dict 변환
@@ -56,12 +59,13 @@
 - G7 live order enabled default 실패 평가
 - script exit code evidence 변환
 - backup/restore status G8 evidence 변환
+- verification evidence bundle JSON 저장
+- verification evidence 수집 script smoke
 - 운영 UI verification status 표시
 - verification gate assessment/evidence repository SQL generation
 
 ## 6. 남은 실제 연동
 
-- `scripts/check`, `scripts/smoke_api`, 백업 검증 결과 자동 evidence 저장/연계
 - G7 제한 실거래 실계좌/모의투자 실측 smoke
 
 ## 7. 검증 명령
