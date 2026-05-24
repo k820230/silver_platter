@@ -2,6 +2,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from typing import Dict, Iterable, List, Optional, Tuple
 
+from silver_platter.data_quality import PriceBarInput
 from silver_platter.ml import HORIZON_DAYS, FeatureSnapshot, ModelRegistry, PredictionInterval, predict_security_metrics
 
 
@@ -156,6 +157,53 @@ def attach_prediction_actual(
         absolute_error=round(absolute_error, 4),
         pct_error=round(pct_error, 6),
     )
+
+
+def match_due_prediction_actuals(
+    predictions: Iterable[StoredPrediction],
+    price_bars: Iterable[PriceBarInput],
+    observed_at: datetime,
+) -> List[StoredPrediction]:
+    bars_by_security: Dict[str, List[PriceBarInput]] = {}
+    for bar in price_bars:
+        if (
+            bar.close_price is None
+            or bar.close_price <= 0
+            or bar.available_to_model_at is None
+            or bar.available_to_model_at > observed_at
+        ):
+            continue
+        bars_by_security.setdefault(bar.security_id, []).append(bar)
+    for bars in bars_by_security.values():
+        bars.sort(key=lambda item: (item.bar_ts, item.available_to_model_at))
+
+    matched: List[StoredPrediction] = []
+    for prediction in predictions:
+        if prediction.actual_price is not None or prediction.target_at > observed_at:
+            matched.append(prediction)
+            continue
+        candidate = next(
+            (
+                bar
+                for bar in bars_by_security.get(prediction.security_id, [])
+                if bar.bar_ts >= prediction.target_at
+            ),
+            None,
+        )
+        if candidate is None:
+            matched.append(prediction)
+            continue
+        matched.append(
+            attach_prediction_actual(
+                prediction,
+                PredictionActual(
+                    prediction_id=prediction.prediction_id,
+                    actual_price=float(candidate.close_price),
+                    observed_at=candidate.available_to_model_at,
+                ),
+            )
+        )
+    return matched
 
 
 def summarize_prediction_errors(

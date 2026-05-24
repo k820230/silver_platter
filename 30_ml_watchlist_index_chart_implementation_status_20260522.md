@@ -38,6 +38,8 @@
 기능:
 
 - prediction target 도래 후 actual price 연결
+- target 도래 prediction의 actual price 자동 매칭
+- `available_to_model_at` 기준 미가용 가격 bar 제외
 - absolute error 계산
 - percentage error 계산
 - 종목별 error summary 계산
@@ -77,6 +79,8 @@
 - prediction job horizon filtering
 - stored prediction 생성
 - actual price 연결
+- due prediction actual 자동 매칭
+- not-due/unavailable price bar 자동 매칭 제외
 - error summary
 - 지수 chart filtering/sorting
 
@@ -85,7 +89,6 @@
 - watchlist 영속 저장
 - ML job queue/RQ 연결
 - model artifact 저장소 연결
-- 실제 가격 도래 시 자동 actual matching
 - model performance dashboard
 - 지수 시계열 Goldilocks writer
 

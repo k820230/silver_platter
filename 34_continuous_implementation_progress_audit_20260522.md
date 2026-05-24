@@ -93,6 +93,7 @@
 - official RSS headline metadata normalization
 - OFAC Recent Actions headline metadata normalization
 - ML ops
+- due prediction actual matching
 - charting
 - backtest
 - paper replay evidence
@@ -142,7 +143,7 @@
 - G7 live safety gate evidence
 - migration coverage
 
-현재 테스트 수: 187개
+현재 테스트 수: 189개
 
 ## 7. 검증 증적
 

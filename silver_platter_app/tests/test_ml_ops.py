@@ -1,12 +1,14 @@
 from datetime import datetime
 from unittest import TestCase
 
+from silver_platter.data_quality import PriceBarInput
 from silver_platter.ml import FeatureSnapshot
 from silver_platter.ml_ops import (
     PredictionActual,
     WatchlistRegistry,
     attach_prediction_actual,
     create_prediction_job,
+    match_due_prediction_actuals,
     run_prediction_job,
     summarize_prediction_errors,
 )
@@ -48,3 +50,88 @@ class MlOpsTests(TestCase):
         self.assertEqual(1, len(predictions))
         self.assertEqual(1, summary.sample_count)
         self.assertGreater(summary.mean_absolute_error, 0)
+
+    def test_match_due_prediction_actuals_uses_first_available_target_bar(self):
+        job = create_prediction_job("job-2", "AAPL", ["1d"])
+        predictions = run_prediction_job(
+            job,
+            FeatureSnapshot(
+                security_id="AAPL",
+                as_of=datetime(2026, 5, 22, 9, 0, 0),
+                last_price=200.0,
+                avg_volume_20d=50_000_000,
+                annualized_volatility=0.30,
+                risk_score=30.0,
+            ),
+        )
+        matched = match_due_prediction_actuals(
+            predictions,
+            [
+                PriceBarInput(
+                    security_id="AAPL",
+                    bar_ts=datetime(2026, 5, 24, 15, 0, 0),
+                    close_price=204.0,
+                    volume=1_000_000,
+                    turnover_krw=10_000_000_000,
+                    available_to_model_at=datetime(2026, 5, 24, 16, 0, 0),
+                ),
+                PriceBarInput(
+                    security_id="AAPL",
+                    bar_ts=datetime(2026, 5, 23, 15, 0, 0),
+                    close_price=203.0,
+                    volume=1_000_000,
+                    turnover_krw=10_000_000_000,
+                    available_to_model_at=datetime(2026, 5, 23, 16, 0, 0),
+                ),
+            ],
+            observed_at=datetime(2026, 5, 24, 9, 0, 0),
+        )
+
+        self.assertEqual(203.0, matched[0].actual_price)
+        self.assertIsNotNone(matched[0].absolute_error)
+
+    def test_match_due_prediction_actuals_ignores_not_due_or_unavailable_bars(self):
+        job = create_prediction_job("job-3", "AAPL", ["1d"])
+        predictions = run_prediction_job(
+            job,
+            FeatureSnapshot(
+                security_id="AAPL",
+                as_of=datetime(2026, 5, 22, 9, 0, 0),
+                last_price=200.0,
+                avg_volume_20d=50_000_000,
+                annualized_volatility=0.30,
+                risk_score=30.0,
+            ),
+        )
+
+        not_due = match_due_prediction_actuals(
+            predictions,
+            [
+                PriceBarInput(
+                    security_id="AAPL",
+                    bar_ts=datetime(2026, 5, 23, 15, 0, 0),
+                    close_price=203.0,
+                    volume=1_000_000,
+                    turnover_krw=10_000_000_000,
+                    available_to_model_at=datetime(2026, 5, 23, 16, 0, 0),
+                ),
+            ],
+            observed_at=datetime(2026, 5, 22, 12, 0, 0),
+        )
+        unavailable = match_due_prediction_actuals(
+            predictions,
+            [
+                PriceBarInput(
+                    security_id="AAPL",
+                    bar_ts=datetime(2026, 5, 23, 15, 0, 0),
+                    close_price=203.0,
+                    volume=1_000_000,
+                    turnover_krw=10_000_000_000,
+                    available_to_model_at=datetime(2026, 5, 24, 16, 0, 0),
+                ),
+            ],
+            observed_at=datetime(2026, 5, 23, 9, 0, 0),
+        )
+
+        self.assertIsNone(not_due[0].actual_price)
+        self.assertIsNone(unavailable[0].actual_price)
