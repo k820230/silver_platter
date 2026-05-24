@@ -93,6 +93,7 @@
 - official RSS headline metadata normalization
 - OFAC Recent Actions headline metadata normalization
 - ML ops
+- watchlist JSON persistence
 - due prediction actual matching
 - ML job API actual matching
 - ML job API error summary response
@@ -145,7 +146,7 @@
 - G7 live safety gate evidence
 - migration coverage
 
-현재 테스트 수: 190개
+현재 테스트 수: 191개
 
 ## 7. 검증 증적
 

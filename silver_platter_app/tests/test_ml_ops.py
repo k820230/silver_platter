@@ -1,4 +1,6 @@
 from datetime import datetime
+from pathlib import Path
+from tempfile import TemporaryDirectory
 from unittest import TestCase
 
 from silver_platter.data_quality import PriceBarInput
@@ -23,6 +25,21 @@ class MlOpsTests(TestCase):
 
         active = registry.list_active("u1")
         self.assertEqual(["MSFT"], [item.security_id for item in active])
+
+    def test_watchlist_registry_json_round_trip_preserves_active_state(self):
+        with TemporaryDirectory() as tmp:
+            path = Path(tmp) / "watchlist.json"
+            registry = WatchlistRegistry()
+            registry.add("u1", "AAPL", note="core")
+            registry.add("u1", "MSFT")
+            registry.remove("u1", "MSFT")
+
+            registry.save_json(path)
+            loaded = WatchlistRegistry.load_json(path)
+
+        self.assertEqual(["AAPL"], [item.security_id for item in loaded.list_active("u1")])
+        self.assertEqual("core", loaded.items[("u1", "AAPL")].note)
+        self.assertFalse(loaded.items[("u1", "MSFT")].is_active)
 
     def test_prediction_job_actual_and_error_summary(self):
         job = create_prediction_job("job-1", "AAPL", ["1d", "bad"])

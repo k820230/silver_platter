@@ -1,5 +1,7 @@
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
+import json
+from pathlib import Path
 from typing import Dict, Iterable, List, Optional, Tuple
 
 from silver_platter.data_quality import PriceBarInput
@@ -52,6 +54,47 @@ class WatchlistRegistry:
             ],
             key=lambda item: item.security_id,
         )
+
+    def save_json(self, path: Path) -> None:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        records = [
+            {
+                "user_id": item.user_id,
+                "security_id": item.security_id,
+                "created_at": item.created_at.isoformat(),
+                "is_active": item.is_active,
+                "note": item.note,
+            }
+            for item in sorted(
+                self.items.values(),
+                key=lambda item: (item.user_id, item.security_id),
+            )
+        ]
+        path.write_text(
+            json.dumps(records, ensure_ascii=True, sort_keys=True, indent=2),
+            encoding="utf-8",
+        )
+
+    @classmethod
+    def load_json(cls, path: Path) -> "WatchlistRegistry":
+        if not path.exists():
+            return cls()
+        records = json.loads(path.read_text(encoding="utf-8"))
+        registry = cls()
+        if not isinstance(records, list):
+            raise ValueError("watchlist registry json must be a list")
+        for record in records:
+            if not isinstance(record, dict):
+                raise ValueError("watchlist registry entry must be an object")
+            item = WatchlistItem(
+                user_id=str(record["user_id"]),
+                security_id=str(record["security_id"]),
+                created_at=datetime.fromisoformat(str(record["created_at"])),
+                is_active=bool(record.get("is_active", True)),
+                note=str(record.get("note", "")),
+            )
+            registry.items[(item.user_id, item.security_id)] = item
+        return registry
 
 
 @dataclass(frozen=True)

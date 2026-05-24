@@ -23,6 +23,7 @@
 - 사용자별 종목 등록
 - 종목 비활성화 방식 remove
 - active watchlist 조회
+- watchlist registry JSON 저장/복구
 
 ### 3.2 ML prediction job
 
@@ -77,6 +78,7 @@
 검증 범위:
 
 - watchlist add/remove/list
+- watchlist JSON persistence round trip
 - prediction job horizon filtering
 - stored prediction 생성
 - actual price 연결
@@ -89,7 +91,7 @@
 
 ## 5. 남은 실제 연동
 
-- watchlist 영속 저장
+- watchlist Goldilocks writer
 - ML job queue/RQ 연결
 - model artifact 저장소 연결
 - model performance dashboard
