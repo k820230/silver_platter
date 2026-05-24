@@ -188,7 +188,7 @@ MVP catalog에는 다음 source가 포함된다.
 - OpenDART network smoke 완료: 실제 API key 환경에서 disclosure_count=100 응답 확인
 - KRX KIND network smoke 완료
 - SEC EDGAR network smoke 완료: 실제 contact User-Agent 환경에서 AAPL disclosure metadata 응답 확인
-- ECOS FX network smoke는 script 준비 완료, 현재 환경은 API key 없음
+- ECOS FX network smoke 완료: 실제 API key 환경에서 USD/KRW rates=10, latest `2026-05-22 1503.5000` 응답 확인
 - Goldilocks 실제 ODBC connection 대상 writer smoke 완료
 - parquet dependency 선택과 운영 이미지 반영
 
