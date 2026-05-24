@@ -983,8 +983,10 @@ def _sql_literal(value: object) -> str:
         return "TRUE" if value else "FALSE"
     if isinstance(value, Number):
         return str(value)
-    if isinstance(value, (datetime, date)):
+    if isinstance(value, datetime):
         return "'%s'" % value.isoformat(sep=" ")
+    if isinstance(value, date):
+        return "'%s'" % value.isoformat()
     return "'%s'" % str(value).replace("'", "''")
 
 

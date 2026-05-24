@@ -185,6 +185,15 @@ class RepositoryTests(TestCase):
             _inline_params("INSERT INTO t VALUES (?, ?)", (True, False)),
         )
 
+    def test_inline_params_renders_date_and_datetime_literals(self):
+        self.assertEqual(
+            "INSERT INTO t VALUES ('2026-05-24', '2026-05-24 09:30:00')",
+            _inline_params(
+                "INSERT INTO t VALUES (?, ?)",
+                (date(2026, 5, 24), datetime(2026, 5, 24, 9, 30, 0)),
+            ),
+        )
+
     def test_insert_provider_symbol_map_persists_provider_mapping(self):
         connection = FakeConnection()
         repository = GoldilocksRepository(connection)
