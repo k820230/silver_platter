@@ -746,6 +746,12 @@ function App() {
   const priceRanges = preview?.price_ranges ?? [];
   const latestPrediction = data.mlJob?.predictions.find((item) => item.horizon === "1w");
   const modelPerformance = data.mlPerformance?.error_summary;
+  const mlIssue =
+    data.mlJob && data.mlJob.predictions.length === 0
+      ? "No predictions returned"
+      : data.mlJob
+        ? ""
+        : "Awaiting forecast";
   const latestIndex = data.indexChart?.points.at(-1);
   const selectedStrategy =
     data.strategyPlugins.find((plugin) => plugin.plugin_id === form.strategyPluginId) ?? null;
@@ -761,6 +767,16 @@ function App() {
     });
   }, [data.groupVolatility]);
   const auditRows = (data.audit?.events ?? []).slice(-5).reverse();
+  const fifoRows = submission
+    ? [
+        {
+          id: submission.broker_order_id ?? submission.state.status,
+          side: submission.preview.side,
+          quantity: toNumber(form.quantity, 0),
+          amount: submission.preview.order_amount_krw,
+        },
+      ]
+    : [];
   const providerCatalogByComponent = useMemo(() => {
     return new Map(
       (data.providerCatalog?.providers ?? []).map((provider) => [
@@ -1096,6 +1112,39 @@ function App() {
 
         <article className="wide-panel">
           <header>
+            <h2>Security ML</h2>
+            <LineChart size={18} />
+          </header>
+          <div className="index-strip">
+            <span>Status</span>
+            <strong className={mlIssue ? "critical" : statusTone(data.mlJob?.job.status)}>
+              {mlIssue || statusLabel(data.mlJob?.job.status)}
+            </strong>
+            <span>Predictions</span>
+            <strong>{data.mlJob ? data.mlJob.predictions.length : "Unknown"}</strong>
+            <span>Samples</span>
+            <strong>{modelPerformance ? modelPerformance.sample_count : "Unknown"}</strong>
+          </div>
+          <div className="range-table" role="table" aria-label="Security ML predictions">
+            <div className="range-row range-head" role="row">
+              <span>Horizon</span>
+              <span>Target</span>
+              <span>Mid</span>
+              <span>Risk</span>
+            </div>
+            {(data.mlJob?.predictions ?? []).map((prediction) => (
+              <div className="range-row" role="row" key={prediction.prediction_id}>
+                <span>{prediction.horizon.toUpperCase()}</span>
+                <span>{new Date(prediction.target_at).toLocaleDateString("en-US")}</span>
+                <span>{formatNumber(prediction.interval.price_mid, 0)}</span>
+                <span>{formatNumber(prediction.interval.risk_score, 1)}</span>
+              </div>
+            ))}
+          </div>
+        </article>
+
+        <article className="wide-panel">
+          <header>
             <h2>Risk Index</h2>
             <LineChart size={18} />
           </header>
@@ -1194,6 +1243,26 @@ function App() {
               ))
             ) : (
               <div className="empty-row">No audit events</div>
+            )}
+          </div>
+        </article>
+
+        <article className="wide-panel">
+          <header>
+            <h2>FIFO Ledger</h2>
+            <ReceiptText size={18} />
+          </header>
+          <div className="audit-list">
+            {fifoRows.length ? (
+              fifoRows.map((row) => (
+                <div className="audit-row" key={row.id}>
+                  <span>{row.side.toUpperCase()}</span>
+                  <strong>{formatNumber(row.quantity, 2)}</strong>
+                  <em>{formatKrw(row.amount)}</em>
+                </div>
+              ))
+            ) : (
+              <div className="empty-row">No FIFO events</div>
             )}
           </div>
         </article>

@@ -115,6 +115,8 @@
 - ML job API error summary response
 - model performance repository writer SQL generation
 - Web model performance dashboard display
+- Web ML diagnostics panel
+- Web FIFO ledger panel
 - charting
 - index chart repository writer SQL generation
 - backtest
