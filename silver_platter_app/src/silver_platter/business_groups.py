@@ -67,6 +67,27 @@ class GroupVolatilityPoint:
     change_pct_from_base: float
 
 
+@dataclass(frozen=True)
+class CurrencyPositionExposure:
+    security_id: str
+    currency: str
+    market_value_krw: float
+
+
+@dataclass(frozen=True)
+class CurrencyExposure:
+    currency: str
+    exposure_krw: float
+    weight: Optional[float]
+
+    def as_dict(self) -> dict:
+        return {
+            "currency": self.currency,
+            "exposure_krw": self.exposure_krw,
+            "weight": self.weight,
+        }
+
+
 def _normalized_tags(tags: Iterable[str]) -> Tuple[str, ...]:
     return tuple(sorted({tag.strip().lower() for tag in tags if tag.strip()}))
 
@@ -227,6 +248,27 @@ def evaluate_business_group_risk(
             None if group_order_to_adv20 is None else round(group_order_to_adv20, 6)
         ),
     )
+
+
+def calculate_currency_exposures(
+    positions: Iterable[CurrencyPositionExposure],
+    total_equity_krw: Optional[float] = None,
+) -> List[CurrencyExposure]:
+    exposures: Dict[str, float] = {}
+    for position in positions:
+        currency = position.currency.strip().upper()
+        if not currency:
+            currency = "UNKNOWN"
+        exposures[currency] = exposures.get(currency, 0.0) + position.market_value_krw
+    denominator = total_equity_krw if total_equity_krw and total_equity_krw > 0 else None
+    return [
+        CurrencyExposure(
+            currency=currency,
+            exposure_krw=round(exposure, 2),
+            weight=None if denominator is None else round(exposure / denominator, 6),
+        )
+        for currency, exposure in sorted(exposures.items())
+    ]
 
 
 def normalized_group_volatility_changes(

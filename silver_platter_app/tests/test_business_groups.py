@@ -3,8 +3,10 @@ from unittest import TestCase
 
 from silver_platter.business_groups import (
     BusinessGroup,
+    CurrencyPositionExposure,
     SecurityBusinessProfile,
     VolatilityObservation,
+    calculate_currency_exposures,
     classify_security,
     evaluate_business_group_risk,
     normalized_group_volatility_changes,
@@ -60,3 +62,18 @@ class BusinessGroupTests(TestCase):
 
         self.assertEqual(10.0, values["g1"][1].change_pct_from_base)
         self.assertEqual(-10.0, values["g2"][1].change_pct_from_base)
+
+    def test_calculates_currency_exposure_weights(self):
+        exposures = calculate_currency_exposures(
+            [
+                CurrencyPositionExposure("005930.KS", "KRW", 1_000_000),
+                CurrencyPositionExposure("AAPL", "USD", 2_000_000),
+                CurrencyPositionExposure("MSFT", "usd", 1_000_000),
+            ],
+            total_equity_krw=4_000_000,
+        )
+
+        by_currency = {item.currency: item for item in exposures}
+        self.assertEqual(1_000_000, by_currency["KRW"].exposure_krw)
+        self.assertEqual(3_000_000, by_currency["USD"].exposure_krw)
+        self.assertEqual(0.75, by_currency["USD"].weight)

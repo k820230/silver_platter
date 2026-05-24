@@ -74,6 +74,7 @@
 - headline/global event risk signal 평가
 - event signal 만료 처리
 - warning/block severity 분리
+- 통화별 포지션 노출 및 전체 자본 대비 비중 계산
 
 ### 3.5 API
 
@@ -138,6 +139,7 @@
 - order state/idempotency/audit repository SQL generation
 - kill switch block
 - event risk warning과 expired signal 무시
+- 통화별 exposure 합산과 weight 계산
 
 ## 5. 남은 실제 연동
 

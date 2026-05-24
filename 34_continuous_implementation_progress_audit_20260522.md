@@ -82,6 +82,7 @@
 - Goldilocks repository SQL command generation
 - data_license repository SQL command generation
 - accounting posting
+- currency exposure calculation
 - audit/order/backtest repository SQL command generation
 - scenario/restore repository SQL command generation
 - verification/alert repository SQL command generation
@@ -169,7 +170,7 @@
 - verification status UI card
 - migration coverage
 
-현재 테스트 수: 208개
+현재 테스트 수: 209개
 
 ## 7. 검증 증적
 
