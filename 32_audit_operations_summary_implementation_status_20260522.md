@@ -42,6 +42,11 @@
 - 전체 상태 `ok/degraded/critical` 계산
 - open issue count 계산
 - provider catalog/credential/smoke 실패 상태를 component status로 변환
+- Redis health component 생성
+- worker heartbeat component 생성
+- broker API status component 생성
+- data delay component 생성
+- disk usage component 생성
 - 운영 대시보드용 summary dict 변환
 
 ### 3.3 Alert delivery
@@ -100,6 +105,7 @@
 - provider health license-policy detail and block state
 - provider health API response
 - provider catalog structured license-policy API response
+- Redis/worker/broker/data-delay/disk health component 생성
 - issue count 계산
 - operations alert message 생성
 - realtime risk alert message 생성

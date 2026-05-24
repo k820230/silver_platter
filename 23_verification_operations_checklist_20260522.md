@@ -235,14 +235,14 @@
 | --- | --- |
 | provider 연결 상태 | [x] |
 | Goldilocks health | [x] |
-| Redis health | [ ] |
-| worker heartbeat | [ ] |
-| broker API 상태 | [ ] |
-| 데이터 지연 | [ ] |
+| Redis health | [x] |
+| worker heartbeat | [x] |
+| broker API 상태 | [x] |
+| 데이터 지연 | [x] |
 | 주문 실패 | [x] |
 | 리스크 한도 위반 | [x] |
 | 백업 실패 | [x] |
-| 디스크 사용률 | [ ] |
+| 디스크 사용률 | [x] |
 
 ## 16. 운영 전환 기준
 

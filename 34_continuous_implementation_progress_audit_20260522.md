@@ -162,6 +162,7 @@
 - operations
 - provider health component mapping
 - provider health license-policy detail
+- infrastructure health component builders
 - operations summary polling in Web dashboard
 - scheduler
 - monthly restore drill scheduler
@@ -180,7 +181,7 @@
 - verification status UI card
 - migration coverage
 
-현재 테스트 수: 218개
+현재 테스트 수: 219개
 
 ## 7. 검증 증적
 

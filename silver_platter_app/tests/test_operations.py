@@ -1,10 +1,15 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 from unittest import TestCase
 
 from silver_platter.operations import (
     ComponentStatus,
+    broker_api_component,
+    data_delay_component,
+    disk_usage_component,
     provider_health_components,
+    redis_health_component,
     summarize_operations,
+    worker_heartbeat_component,
 )
 from silver_platter.providers import ProviderLicensePolicy, ProviderMetadata
 
@@ -68,3 +73,27 @@ class OperationsTests(TestCase):
         self.assertEqual("block", components[0].status)
         self.assertIn("license blocks storage or transformation", components[0].detail)
         self.assertIn("license=vendor_view_only", components[0].detail)
+
+    def test_infrastructure_health_component_builders(self):
+        checked_at = datetime(2026, 5, 22, 9, 0, 0)
+
+        redis = redis_health_component(lambda: True, checked_at=checked_at)
+        worker = worker_heartbeat_component(
+            "scheduler",
+            checked_at - timedelta(seconds=30),
+            checked_at=checked_at,
+        )
+        broker = broker_api_component("kis", False, checked_at=checked_at)
+        delay = data_delay_component(
+            "price_bars",
+            checked_at - timedelta(seconds=600),
+            max_delay_seconds=300,
+            checked_at=checked_at,
+        )
+        disk = disk_usage_component("/", checked_at=checked_at)
+
+        self.assertEqual("ready", redis.status)
+        self.assertEqual("ready", worker.status)
+        self.assertEqual("degraded", broker.status)
+        self.assertEqual("degraded", delay.status)
+        self.assertIn("disk:/", disk.component)

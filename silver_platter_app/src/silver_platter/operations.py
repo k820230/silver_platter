@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Dict, Iterable, List, Optional
+import shutil
+from typing import Callable, Dict, Iterable, List, Optional
 
 from silver_platter.providers import (
     ProviderLicensePolicy,
@@ -117,3 +118,94 @@ def provider_health_components(
             )
         )
     return sorted(components, key=lambda item: item.component)
+
+
+def redis_health_component(
+    ping: Callable[[], bool],
+    checked_at: Optional[datetime] = None,
+) -> ComponentStatus:
+    timestamp = checked_at or datetime.utcnow()
+    try:
+        healthy = bool(ping())
+    except Exception as exc:
+        return ComponentStatus("redis", "failed", "redis ping failed: %s" % exc, timestamp)
+    return ComponentStatus(
+        "redis",
+        "ready" if healthy else "failed",
+        "redis ping ok" if healthy else "redis ping returned false",
+        timestamp,
+    )
+
+
+def worker_heartbeat_component(
+    worker_id: str,
+    last_seen_at: Optional[datetime],
+    max_age_seconds: int = 120,
+    checked_at: Optional[datetime] = None,
+) -> ComponentStatus:
+    timestamp = checked_at or datetime.utcnow()
+    if last_seen_at is None:
+        return ComponentStatus("worker:%s" % worker_id, "failed", "heartbeat missing", timestamp)
+    age_seconds = (timestamp - last_seen_at).total_seconds()
+    status = "ready" if age_seconds <= max_age_seconds else "degraded"
+    return ComponentStatus(
+        "worker:%s" % worker_id,
+        status,
+        "heartbeat_age_seconds=%.0f max_age_seconds=%s" % (age_seconds, max_age_seconds),
+        timestamp,
+    )
+
+
+def broker_api_component(
+    broker_code: str,
+    reachable: bool,
+    detail: str = "",
+    checked_at: Optional[datetime] = None,
+) -> ComponentStatus:
+    return ComponentStatus(
+        "broker:%s" % broker_code,
+        "ready" if reachable else "degraded",
+        detail or ("broker API reachable" if reachable else "broker API unreachable"),
+        checked_at or datetime.utcnow(),
+    )
+
+
+def data_delay_component(
+    dataset_name: str,
+    latest_available_at: Optional[datetime],
+    max_delay_seconds: int,
+    checked_at: Optional[datetime] = None,
+) -> ComponentStatus:
+    timestamp = checked_at or datetime.utcnow()
+    if latest_available_at is None:
+        return ComponentStatus("data_delay:%s" % dataset_name, "failed", "no data available", timestamp)
+    delay_seconds = (timestamp - latest_available_at).total_seconds()
+    status = "ready" if delay_seconds <= max_delay_seconds else "degraded"
+    return ComponentStatus(
+        "data_delay:%s" % dataset_name,
+        status,
+        "delay_seconds=%.0f max_delay_seconds=%s" % (delay_seconds, max_delay_seconds),
+        timestamp,
+    )
+
+
+def disk_usage_component(
+    path: str,
+    warning_used_ratio: float = 0.85,
+    critical_used_ratio: float = 0.95,
+    checked_at: Optional[datetime] = None,
+) -> ComponentStatus:
+    usage = shutil.disk_usage(path)
+    used_ratio = (usage.total - usage.free) / usage.total if usage.total else 1.0
+    if used_ratio >= critical_used_ratio:
+        status = "critical"
+    elif used_ratio >= warning_used_ratio:
+        status = "degraded"
+    else:
+        status = "ready"
+    return ComponentStatus(
+        "disk:%s" % path,
+        status,
+        "used_ratio=%.4f free_bytes=%s total_bytes=%s" % (used_ratio, usage.free, usage.total),
+        checked_at or datetime.utcnow(),
+    )
