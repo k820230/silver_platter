@@ -2,6 +2,7 @@
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
+. scripts/load_local_env
 
 PYTHONPATH=src python3 - <<'PY'
 from silver_platter.config import AppSettings, sec_edgar_user_agent_has_real_contact

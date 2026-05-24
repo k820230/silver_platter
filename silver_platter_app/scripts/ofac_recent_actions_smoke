@@ -2,6 +2,7 @@
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
+. scripts/load_local_env
 
 if [ "${OFAC_RECENT_ACTIONS_SMOKE_ENABLED:-0}" != "1" ]; then
   echo "OFAC recent actions smoke skipped: set OFAC_RECENT_ACTIONS_SMOKE_ENABLED=1 to run read-only network check"
