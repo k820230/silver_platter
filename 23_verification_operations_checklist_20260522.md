@@ -90,7 +90,7 @@
 | worker heartbeat 정상 | [ ] |
 | scheduler timezone `Asia/Seoul` | [x] |
 | `.env` 비밀값 git 제외 | [x] |
-| 로그 경로 쓰기 가능 | [ ] |
+| 로그 경로 쓰기 가능 | [x] |
 
 ## 6. 데이터 검증 체크리스트
 
@@ -223,10 +223,10 @@
 | 주문 승인 audit | [x] |
 | 알림 mute/확인 audit | [x] |
 | risk override audit | [x] |
-| backup 접근 권한 | [ ] |
-| 외부 포트 제한 | [ ] |
-| HTTPS 필요성 검토 | [ ] |
-| 사용자 권한 matrix | [ ] |
+| backup 접근 권한 | [x] |
+| 외부 포트 제한 | [x] |
+| HTTPS 필요성 검토 | [x] |
+| 사용자 권한 matrix | [x] |
 | 로그 민감정보 마스킹 | [x] |
 
 ## 15. 운영 모니터링 체크리스트

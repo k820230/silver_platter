@@ -162,6 +162,7 @@
 - alert acknowledgement/mute audit
 - risk override audit
 - audit sensitive detail masking
+- security permission matrix and local checks
 - operations
 - provider health component mapping
 - provider health license-policy detail
@@ -184,7 +185,7 @@
 - verification status UI card
 - migration coverage
 
-현재 테스트 수: 220개
+현재 테스트 수: 223개
 
 ## 7. 검증 증적
 
