@@ -214,6 +214,27 @@ class BrokerOrderServiceTests(TestCase):
             transport.calls[1][2],
         )
 
+    def test_kis_adapter_reuses_supplied_access_token(self):
+        transport = FakeKisTransport()
+        adapter = KoreaInvestmentBrokerAdapter(
+            credentials=KoreaInvestmentCredentials(
+                "app",
+                "secret",
+                "12345678",
+                trading_env="demo",
+            ),
+            transport=transport,
+            access_token="cached-token",
+        )
+
+        result = adapter.inquire_domestic_orderable("005930", order_price=0)
+
+        self.assertEqual("cached-token", adapter.access_token)
+        self.assertEqual(71, result.nrcvb_buy_quantity)
+        self.assertEqual(1, len(transport.calls))
+        self.assertEqual("/uapi/domestic-stock/v1/trading/inquire-psbl-order", transport.calls[0][0])
+        self.assertEqual("Bearer cached-token", transport.calls[0][1]["authorization"])
+
     def test_kis_adapter_rejects_unsupported_market_before_send(self):
         transport = FakeKisTransport()
         adapter = KoreaInvestmentBrokerAdapter(

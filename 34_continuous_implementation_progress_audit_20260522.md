@@ -216,7 +216,7 @@
 - `./scripts/migrate apply --dry-run`
 - `./scripts/goldilocks_odbc_smoke` skip 확인: ODBC 설정 없음
 - `./scripts/goldilocks_repository_smoke` skip 확인: opt-in 또는 ODBC 설정 없음
-- `./scripts/kis_orderable_smoke` skip 확인: KIS query credential 설정 없음
+- `./scripts/kis_orderable_smoke` 통과: `005930` 매수가능조회 응답 확인
 - `./scripts/sec_edgar_smoke` skip 확인: placeholder User-Agent
 - `./scripts/opendart_smoke` skip 확인: OPENDART_API_KEY 설정 없음
 - `./scripts/krx_kind_smoke` skip 확인: KRX_KIND_SMOKE_ENABLED 설정 없음
@@ -268,7 +268,7 @@
 - OFAC Recent Actions smoke는 script 준비 완료, 현재 환경은 opt-in disabled
 - Goldilocks ODBC 대상 repository writer smoke
   - `scripts/goldilocks_repository_smoke` 준비 완료, 현재 환경은 opt-in write flag/ODBC 설정 없음
-- KIS 매수가능조회 smoke는 script 준비 완료, 현재 환경은 credential/base URL 설정 없음
+- KIS 매수가능조회 smoke 완료
 - 장기 대량 replay는 실제 snapshot 확보 후 실행/튜닝 필요
 - 실제 webhook alert delivery smoke는 script 준비 완료, 현재 환경은 URL 설정 없음
 - G7 제한 실거래 실계좌/모의투자 실측 smoke

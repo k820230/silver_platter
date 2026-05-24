@@ -4,6 +4,13 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 PYTHONPATH=src python3 - <<'PY'
+import hashlib
+import json
+import os
+from pathlib import Path
+import time
+import urllib.error
+
 from silver_platter.broker import (
     KoreaInvestmentBrokerAdapter,
     KoreaInvestmentCredentials,
@@ -11,11 +18,68 @@ from silver_platter.broker import (
 )
 from silver_platter.config import AppSettings
 
+
+def cache_key(kis):
+    value = "|".join(
+        [
+            kis.api_base_url,
+            kis.app_key,
+            kis.account_number,
+            kis.account_product_code,
+            kis.trading_env,
+        ]
+    )
+    return hashlib.sha256(value.encode("utf-8")).hexdigest()
+
+
+def load_cached_token(path, expected_key):
+    if not path.exists():
+        return ""
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return ""
+    if payload.get("cache_key") != expected_key:
+        return ""
+    if float(payload.get("expires_at", 0)) <= time.time() + 300:
+        return ""
+    return str(payload.get("access_token", ""))
+
+
+def save_cached_token(path, expected_key, token):
+    if not token:
+        return
+    ttl_seconds = int(os.getenv("KIS_ACCESS_TOKEN_CACHE_TTL_SECONDS", "82800"))
+    payload = {
+        "cache_key": expected_key,
+        "access_token": token,
+        "expires_at": time.time() + ttl_seconds,
+    }
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(payload, sort_keys=True), encoding="utf-8")
+    path.chmod(0o600)
+
+
+def describe_http_error(exc):
+    try:
+        body = exc.read().decode("utf-8", "replace").strip()
+    except Exception:
+        body = ""
+    detail = " %s" % body[:500] if body else ""
+    return "HTTP %s%s" % (exc.code, detail)
+
+
 settings = AppSettings.from_env()
 kis = settings.kis
 if not kis.configured_for_queries():
     print("KIS orderable smoke skipped: KIS_APP_KEY, KIS_APP_SECRET, KIS_ACCOUNT_NO, and KIS_API_BASE_URL are required")
     raise SystemExit(0)
+
+token_cache_path = Path(os.getenv("KIS_ACCESS_TOKEN_CACHE", "var/kis_access_token.json"))
+expected_cache_key = cache_key(kis)
+cached_token = os.getenv("KIS_ACCESS_TOKEN", "").strip()
+if not cached_token:
+    cached_token = load_cached_token(token_cache_path, expected_cache_key)
 
 adapter = KoreaInvestmentBrokerAdapter(
     live_order_enabled=False,
@@ -27,8 +91,36 @@ adapter = KoreaInvestmentBrokerAdapter(
         trading_env=kis.trading_env,
     ),
     transport=KoreaInvestmentHttpTransport(kis.api_base_url),
+    access_token=cached_token or None,
 )
-result = adapter.inquire_domestic_orderable("005930", order_price=0, order_type="market")
+try:
+    result = adapter.inquire_domestic_orderable("005930", order_price=0, order_type="market")
+except urllib.error.HTTPError as exc:
+    if cached_token and exc.code in {401, 403} and not os.getenv("KIS_ACCESS_TOKEN", "").strip():
+        token_cache_path.unlink(missing_ok=True)
+        adapter = KoreaInvestmentBrokerAdapter(
+            live_order_enabled=False,
+            credentials=KoreaInvestmentCredentials(
+                app_key=kis.app_key,
+                app_secret=kis.app_secret,
+                account_number=kis.account_number,
+                account_product_code=kis.account_product_code,
+                trading_env=kis.trading_env,
+            ),
+            transport=KoreaInvestmentHttpTransport(kis.api_base_url),
+        )
+        result = adapter.inquire_domestic_orderable("005930", order_price=0, order_type="market")
+    else:
+        print("KIS orderable smoke failed: %s" % describe_http_error(exc))
+        if not cached_token and exc.code == 403:
+            print(
+                "KIS access token issuance may be rate-limited; retry after the provider window resets or set KIS_ACCESS_TOKEN to reuse an issued token."
+            )
+        raise SystemExit(1)
+
+if not os.getenv("KIS_ACCESS_TOKEN", "").strip():
+    save_cached_token(token_cache_path, expected_cache_key, adapter.access_token or "")
+
 print(
     "KIS orderable smoke passed: security_id=%s order_division=%s nrcvb_buy_qty=%s max_buy_qty=%s"
     % (

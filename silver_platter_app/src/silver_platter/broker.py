@@ -156,11 +156,12 @@ class KoreaInvestmentBrokerAdapter(BrokerAdapter):
         live_order_enabled: bool = False,
         credentials: Optional[KoreaInvestmentCredentials] = None,
         transport: Optional[KoreaInvestmentTransport] = None,
+        access_token: Optional[str] = None,
     ):
         self.live_order_enabled = live_order_enabled
         self.credentials = credentials
         self.transport = transport
-        self._access_token: Optional[str] = None
+        self._access_token: Optional[str] = access_token
 
     def submit_order(self, request: BrokerOrderRequest) -> BrokerOrderAck:
         if not self.live_order_enabled:
@@ -292,6 +293,10 @@ class KoreaInvestmentBrokerAdapter(BrokerAdapter):
             raise RuntimeError("Korea Investment OAuth response did not include access_token")
         self._access_token = token
         return token
+
+    @property
+    def access_token(self) -> Optional[str]:
+        return self._access_token
 
     def _auth_headers(self, token: str, tr_id: str) -> Dict[str, str]:
         assert self.credentials is not None
