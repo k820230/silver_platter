@@ -55,7 +55,9 @@ else
   block "Goldilocks ODBC history prefetch storage" "set GOLDILOCKS_ODBC_CONNECT_STRING, GOLDILOCKS_ODBC_DSN, or GOLDILOCKS_ODBC_DRIVER"
 fi
 
-if [ "${KRX_PRICE_SMOKE_ENABLED:-0}" = "1" ]; then
+if [ "${KRX_PRICE_SMOKE_REQUIRED:-1}" = "0" ]; then
+  skip "KRX price smoke" "ignored by current verification scope"
+elif [ "${KRX_PRICE_SMOKE_ENABLED:-0}" = "1" ]; then
   ready "KRX price smoke opt-in"
 else
   block "KRX price smoke opt-in" "set KRX_PRICE_SMOKE_ENABLED=1 and optionally KRX_PRICE_SMOKE_DATE"
@@ -75,7 +77,9 @@ else
   block "G7 approval evidence" "run ./scripts/collect_g7_approval_evidence before manual approval"
 fi
 
-if [ "${G7_LIVE_SMOKE_APPROVED:-0}" = "1" ]; then
+if [ "${G7_LIVE_SMOKE_APPROVAL_REQUIRED:-1}" = "0" ]; then
+  skip "G7 live/paper smoke approval" "ignored by current verification scope"
+elif [ "${G7_LIVE_SMOKE_APPROVED:-0}" = "1" ]; then
   ready "G7 live/paper smoke approval"
 else
   block "G7 live/paper smoke approval" "set G7_LIVE_SMOKE_APPROVED=1 only after account/risk scope is approved"

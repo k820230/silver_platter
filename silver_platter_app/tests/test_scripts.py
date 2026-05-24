@@ -148,6 +148,43 @@ class ScriptHelperTests(TestCase):
             self.assertIn("ready: G7 live/paper smoke approval", result.stdout)
             self.assertIn("external smoke readiness passed", result.stdout)
 
+    def test_external_smoke_readiness_can_skip_krx_and_g7_approval(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self._copy_readiness_scripts(root)
+            snapshot = root / "snapshot.jsonl"
+            snapshot.write_text("{}", encoding="utf-8")
+            g7_evidence = root / "g7-evidence.json"
+            g7_evidence.write_text("{}", encoding="utf-8")
+            (root / ".env").write_text(
+                "\n".join(
+                    [
+                        "SEC_EDGAR_USER_AGENT=Silver Platter ops@silverplatter.dev",
+                        "OPENDART_API_KEY=dart-key",
+                        "ECOS_API_KEY=ecos-key",
+                        "GOLDILOCKS_ODBC_DSN=sp_test",
+                        "KRX_PRICE_SMOKE_REQUIRED=0",
+                        "LONG_REPLAY_SNAPSHOT_PATH=%s" % snapshot,
+                        "G7_APPROVAL_EVIDENCE_PATH=%s" % g7_evidence,
+                        "G7_LIVE_SMOKE_APPROVAL_REQUIRED=0",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            result = subprocess.run(
+                ["bash", "scripts/external_smoke_readiness"],
+                cwd=root,
+                env=self._script_env(),
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertIn("skipped: KRX price smoke", result.stdout)
+            self.assertIn("skipped: G7 live/paper smoke approval", result.stdout)
+            self.assertIn("external smoke readiness passed", result.stdout)
+
     def test_prepare_long_replay_snapshot_writes_replayable_jsonl(self):
         script = Path(__file__).resolve().parents[1] / "scripts" / "prepare_long_replay_snapshot"
         replay_script = Path(__file__).resolve().parents[1] / "scripts" / "replay_exported_snapshot"
