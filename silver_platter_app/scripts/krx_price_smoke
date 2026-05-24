@@ -19,7 +19,10 @@ from silver_platter.providers import KrxDailyPriceProvider
 symbol = "${SYMBOL}"
 trade_date = date.fromisoformat("${TRADE_DATE}" or date.today().isoformat())
 provider = KrxDailyPriceProvider(trade_date=trade_date)
-bars = list(provider.get_price_bars(symbol))
+try:
+    bars = list(provider.get_price_bars(symbol))
+except RuntimeError as exc:
+    raise SystemExit("KRX price smoke failed: %s" % exc) from exc
 if not bars:
     raise SystemExit(
         "KRX price smoke failed: no bars returned for %s on %s"

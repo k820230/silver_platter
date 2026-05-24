@@ -19,6 +19,7 @@ from silver_platter.providers import (
     StaticDisclosureMetadataProvider,
     StaticFxRateProvider,
     StaticReferenceDataProvider,
+    _default_krx_csv_fetcher,
     _default_json_fetcher,
     default_mvp_provider_catalog,
     license_policy_from_provider,
@@ -147,6 +148,26 @@ class ProviderTests(TestCase):
         self.assertEqual("ALL", calls[0][3]["mktId"])
         self.assertEqual("20260522", calls[0][3]["trdDd"])
         self.assertEqual("dbms/MDC/STAT/standard/MDCSTAT01501", calls[0][3]["url"])
+
+    def test_krx_csv_fetcher_reports_logout_otp(self):
+        class FakeResponse:
+            def __enter__(self):
+                return self
+
+            def __exit__(self, exc_type, exc, traceback):
+                return False
+
+            def read(self):
+                return b"LOGOUT"
+
+        with patch("silver_platter.providers.urllib.request.urlopen", return_value=FakeResponse()):
+            with self.assertRaisesRegex(RuntimeError, "LOGOUT"):
+                _default_krx_csv_fetcher(
+                    "https://data.krx.co.kr/otp",
+                    "https://data.krx.co.kr/download",
+                    {},
+                    {"url": "dbms/MDC/STAT/standard/MDCSTAT01501"},
+                )
 
     def test_sec_edgar_provider_requires_user_agent(self):
         with self.assertRaises(ValueError):

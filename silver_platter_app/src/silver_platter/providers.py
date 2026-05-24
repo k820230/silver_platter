@@ -457,6 +457,11 @@ def _default_krx_csv_fetcher(
         otp_code = response.read().decode("utf-8").strip()
     if not otp_code:
         raise RuntimeError("KRX OTP generation returned an empty code")
+    if otp_code.upper() == "LOGOUT":
+        raise RuntimeError(
+            "KRX OTP generation returned LOGOUT; the data portal rejected the "
+            "session before CSV download"
+        )
 
     download_payload = urllib.parse.urlencode({"code": otp_code}).encode("utf-8")
     download_request = urllib.request.Request(
