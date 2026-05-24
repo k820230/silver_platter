@@ -2,14 +2,20 @@
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
+
+requested_enabled="${KRX_KIND_SMOKE_ENABLED:-}"
+requested_symbol="${KRX_KIND_SMOKE_SYMBOL:-}"
 . scripts/load_local_env
 
-if [ "${KRX_KIND_SMOKE_ENABLED:-0}" != "1" ]; then
+KRX_KIND_SMOKE_ENABLED="${requested_enabled:-${KRX_KIND_SMOKE_ENABLED:-0}}"
+KRX_KIND_SMOKE_SYMBOL="${requested_symbol:-${KRX_KIND_SMOKE_SYMBOL:-005930}}"
+
+if [ "${KRX_KIND_SMOKE_ENABLED}" != "1" ]; then
   echo "KRX KIND smoke skipped: set KRX_KIND_SMOKE_ENABLED=1 to run read-only network check"
   exit 0
 fi
 
-SYMBOL="${KRX_KIND_SMOKE_SYMBOL:-005930}"
+SYMBOL="${KRX_KIND_SMOKE_SYMBOL}"
 
 PYTHONPATH=src python3 - <<PY
 from datetime import date, timedelta

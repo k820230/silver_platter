@@ -272,6 +272,49 @@ class ScriptHelperTests(TestCase):
 
             self.assertIn("History prefetch smoke skipped", result.stdout)
 
+    def test_optional_provider_smokes_preserve_explicit_disabled_env(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self._copy_scripts(
+                root,
+                [
+                    "krx_kind_smoke",
+                    "official_rss_smoke",
+                    "ofac_recent_actions_smoke",
+                    "load_local_env",
+                ],
+            )
+            (root / ".env").write_text(
+                "\n".join(
+                    [
+                        "KRX_KIND_SMOKE_ENABLED=1",
+                        "OFFICIAL_RSS_SMOKE_ENABLED=1",
+                        "OFAC_RECENT_ACTIONS_SMOKE_ENABLED=1",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            cases = [
+                ("krx_kind_smoke", "KRX_KIND_SMOKE_ENABLED", "KRX KIND smoke skipped"),
+                ("official_rss_smoke", "OFFICIAL_RSS_SMOKE_ENABLED", "Official RSS smoke skipped"),
+                (
+                    "ofac_recent_actions_smoke",
+                    "OFAC_RECENT_ACTIONS_SMOKE_ENABLED",
+                    "OFAC recent actions smoke skipped",
+                ),
+            ]
+            for script_name, env_name, expected in cases:
+                result = subprocess.run(
+                    ["bash", "scripts/%s" % script_name],
+                    cwd=root,
+                    env={**self._script_env(), env_name: "0"},
+                    check=True,
+                    capture_output=True,
+                    text=True,
+                )
+                self.assertIn(expected, result.stdout)
+
     def test_collect_g7_approval_evidence_writes_pass_bundle_without_approval(self):
         script = Path(__file__).resolve().parents[1] / "scripts" / "collect_g7_approval_evidence"
         with TemporaryDirectory() as tmp:
