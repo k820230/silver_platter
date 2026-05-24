@@ -99,6 +99,9 @@ MVP catalog에는 다음 source가 포함된다.
 - turnover 누락
 - `available_to_model_at` 누락
 - empty dataset
+- data quality score
+- latest-window average turnover
+- corporate action price/volume adjustment helper
 
 ### 3.4 Export helper
 
@@ -152,6 +155,7 @@ MVP catalog에는 다음 source가 포함된다.
 추가 테스트:
 
 - `tests/test_providers.py`
+- `tests/test_data_quality.py`
 - `tests/test_data_pipeline.py`
 - `tests/test_exports.py`
 
@@ -169,6 +173,9 @@ MVP catalog에는 다음 source가 포함된다.
 - audit/order/backtest repository SQL command generation
 - verification/alert repository SQL command generation
 - price bar ingestion quality와 manifest 생성
+- data quality score 산출
+- 최신 window 평균 거래대금 계산
+- corporate action 이전 bar 가격/거래량 조정
 - raw manifest digest 안정성
 - partitioned export 파일 생성과 checksum
 - exported snapshot round-trip 로딩

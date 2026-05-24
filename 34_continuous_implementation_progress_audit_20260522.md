@@ -68,6 +68,9 @@
 추가/확장된 테스트 범위:
 
 - migration plan/apply SQL split, checksum, applied 기록, checksum mismatch 방지
+- data quality score
+- latest-window average turnover helper
+- corporate action price/volume adjustment helper
 - KRX daily price CSV normalization
 - SEC EDGAR submissions metadata normalization
 - OpenDART disclosure metadata normalization
@@ -164,7 +167,7 @@
 - verification status UI card
 - migration coverage
 
-현재 테스트 수: 206개
+현재 테스트 수: 208개
 
 ## 7. 검증 증적
 

@@ -98,13 +98,13 @@
 | --- | --- |
 | 종목 master 국내/미국 구분 | [x] |
 | 가격 bar 중복 방지 | [x] |
-| corporate action 반영 | [ ] |
-| 평균 거래대금 계산 | [ ] |
+| corporate action 반영 | [x] |
+| 평균 거래대금 계산 | [x] |
 | 환율 데이터 수집 | [x] |
 | OpenDART/KRX/KIND/SEC EDGAR 후보 연결 검토 | [x] |
 | headline은 headline+metadata만 저장 | [x] |
 | provider license/entitlement 기록 | [x] |
-| data quality score 산출 | [ ] |
+| data quality score 산출 | [x] |
 | `available_to_model_at` 저장 | [x] |
 
 ## 7. ML/예측 검증 체크리스트
