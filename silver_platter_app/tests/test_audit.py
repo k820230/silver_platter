@@ -5,6 +5,8 @@ from silver_platter.audit import (
     AuditLog,
     build_setting_change_detail,
     filter_audit_events,
+    record_alert_user_action,
+    record_risk_override,
 )
 
 
@@ -52,6 +54,21 @@ class AuditTests(TestCase):
         self.assertEqual("s1", event.detail["actor_session_id"])
         self.assertEqual("web", event.detail["actor_source"])
 
+    def test_append_masks_sensitive_detail(self):
+        log = AuditLog()
+
+        event = log.append(
+            actor_type="system",
+            actor_id="api",
+            action_code="SECRET_TEST",
+            target_type="config",
+            detail={"api_key": "plain", "status": "ok"},
+            occurred_at=datetime(2026, 5, 22, 9, 0, 0),
+        )
+
+        self.assertEqual("***", event.detail["api_key"])
+        self.assertEqual("ok", event.detail["status"])
+
     def test_build_setting_change_detail_records_only_changed_values(self):
         detail = build_setting_change_detail(
             {"max_order_krw": 100, "mode": "paper"},
@@ -62,3 +79,26 @@ class AuditTests(TestCase):
         self.assertIn('"max_order_krw": 100', detail["before"])
         self.assertIn('"max_order_krw": 200', detail["after"])
         self.assertIn('"kill_switch": true', detail["after"])
+
+    def test_records_alert_ack_and_risk_override_audit_events(self):
+        log = AuditLog()
+
+        alert_event = record_alert_user_action(
+            log,
+            alert_id="alert-1",
+            action="ack",
+            user_id="u1",
+            occurred_at=datetime(2026, 5, 22, 9, 0, 0),
+        )
+        override_event = record_risk_override(
+            log,
+            override_id="override-1",
+            user_id="u1",
+            reason="manual review",
+            scope="single_order",
+            occurred_at=datetime(2026, 5, 22, 9, 1, 0),
+        )
+
+        self.assertEqual("ALERT_ACK", alert_event.action_code)
+        self.assertEqual("RISK_OVERRIDE", override_event.action_code)
+        self.assertEqual("manual review", override_event.detail["reason"])

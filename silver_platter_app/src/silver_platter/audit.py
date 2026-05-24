@@ -50,6 +50,7 @@ class AuditLog:
             event_detail.setdefault("actor_session_id", session_id)
         if source:
             event_detail.setdefault("actor_source", source)
+        event_detail = mask_sensitive_detail(event_detail)
         event = AuditEvent(
             actor_type=actor_type,
             actor_id=actor_id or user_id or session_id,
@@ -89,6 +90,18 @@ def filter_audit_events(
     return sorted(selected, key=lambda item: item.occurred_at)
 
 
+def mask_sensitive_detail(detail: Dict[str, str]) -> Dict[str, str]:
+    sensitive_tokens = ("secret", "token", "password", "api_key", "appkey", "appsecret")
+    masked: Dict[str, str] = {}
+    for key, value in detail.items():
+        normalized = key.strip().lower()
+        if any(token in normalized for token in sensitive_tokens):
+            masked[key] = "***"
+        else:
+            masked[key] = value
+    return masked
+
+
 def build_setting_change_detail(
     before: Dict[str, Any],
     after: Dict[str, Any],
@@ -111,3 +124,54 @@ def build_setting_change_detail(
             sort_keys=True,
         ),
     }
+
+
+def record_alert_user_action(
+    audit_log: AuditLog,
+    alert_id: str,
+    action: str,
+    user_id: str,
+    session_id: Optional[str] = None,
+    source: str = "web",
+    occurred_at: Optional[datetime] = None,
+) -> AuditEvent:
+    normalized_action = action.strip().upper()
+    if normalized_action not in {"ACK", "MUTE"}:
+        raise ValueError("alert user action must be ACK or MUTE")
+    return audit_log.append(
+        actor_type="user",
+        user_id=user_id,
+        session_id=session_id,
+        source=source,
+        action_code="ALERT_%s" % normalized_action,
+        target_type="alert",
+        target_id=alert_id,
+        detail={"alert_action": normalized_action.lower()},
+        occurred_at=occurred_at,
+    )
+
+
+def record_risk_override(
+    audit_log: AuditLog,
+    override_id: str,
+    user_id: str,
+    reason: str,
+    scope: str,
+    session_id: Optional[str] = None,
+    source: str = "web",
+    occurred_at: Optional[datetime] = None,
+) -> AuditEvent:
+    return audit_log.append(
+        actor_type="user",
+        user_id=user_id,
+        session_id=session_id,
+        source=source,
+        action_code="RISK_OVERRIDE",
+        target_type="risk_override",
+        target_id=override_id,
+        detail={
+            "scope": scope,
+            "reason": reason,
+        },
+        occurred_at=occurred_at,
+    )

@@ -156,6 +156,9 @@
 - audit actor context
 - setting change audit diff
 - setting change audit API
+- alert acknowledgement/mute audit
+- risk override audit
+- audit sensitive detail masking
 - operations
 - provider health component mapping
 - provider health license-policy detail
@@ -177,7 +180,7 @@
 - verification status UI card
 - migration coverage
 
-현재 테스트 수: 216개
+현재 테스트 수: 218개
 
 ## 7. 검증 증적
 

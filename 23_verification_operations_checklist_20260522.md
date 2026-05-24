@@ -221,13 +221,13 @@
 | API key git 제외 | [x] |
 | 실거래 권한 분리 | [x] |
 | 주문 승인 audit | [x] |
-| 알림 mute/확인 audit | [ ] |
-| risk override audit | [ ] |
+| 알림 mute/확인 audit | [x] |
+| risk override audit | [x] |
 | backup 접근 권한 | [ ] |
 | 외부 포트 제한 | [ ] |
 | HTTPS 필요성 검토 | [ ] |
 | 사용자 권한 matrix | [ ] |
-| 로그 민감정보 마스킹 | [ ] |
+| 로그 민감정보 마스킹 | [x] |
 
 ## 15. 운영 모니터링 체크리스트
 

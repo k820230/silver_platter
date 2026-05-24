@@ -25,6 +25,9 @@
 - action/target 기반 query
 - user/session/source actor context 기록
 - setting 변경 before/after diff detail 생성
+- alert 확인/뮤트 audit event helper
+- risk override audit event helper
+- 민감정보 detail masking
 - API 응답용 dict 변환
 
 ### 3.2 Operations summary
@@ -88,6 +91,9 @@
 - target 기반 filter
 - audit actor context 기록
 - setting 변경 diff detail 저장
+- alert 확인 audit 기록
+- risk override audit 기록
+- audit detail 민감정보 masking
 - setting change audit API response
 - operations status escalation
 - provider health component mapping
