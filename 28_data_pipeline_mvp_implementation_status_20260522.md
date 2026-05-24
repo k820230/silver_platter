@@ -187,7 +187,7 @@ MVP catalog에는 다음 source가 포함된다.
 - KRX Data Marketplace daily price network smoke는 opt-in 실행 시 KRX portal OTP가 `LOGOUT`을 반환해 blocked
 - OpenDART network smoke는 script 준비 완료, 현재 환경은 API key 없음
 - KRX KIND network smoke 완료
-- SEC EDGAR network smoke는 script 준비 완료, 현재 환경은 placeholder User-Agent라 skip
+- SEC EDGAR network smoke 완료: 실제 contact User-Agent 환경에서 AAPL disclosure metadata 응답 확인
 - ECOS FX network smoke는 script 준비 완료, 현재 환경은 API key 없음
 - Goldilocks 실제 ODBC connection 대상 writer smoke 완료
 - parquet dependency 선택과 운영 이미지 반영

@@ -222,7 +222,7 @@
 - `GOLDILOCKS_REPOSITORY_SMOKE_WRITE=1 ./scripts/goldilocks_repository_smoke` 통과: provider/license/audit/scenario/restore/headline writer rollback 확인
 - `./scripts/collect_verification_evidence --skip-check --run-smoke-api --no-backup --write-goldilocks --output var/verification/evidence-bundle-goldilocks-smoke.json` 통과: G2 assessment/evidence Goldilocks persistence path 확인
 - `./scripts/kis_orderable_smoke` 통과: `005930` 매수가능조회 응답 확인
-- `./scripts/sec_edgar_smoke` skip 확인: placeholder User-Agent
+- `./scripts/sec_edgar_smoke` 통과: 실제 contact User-Agent 환경에서 AAPL disclosure_count=149, latest `0000320193-26-000013`
 - `./scripts/opendart_smoke` skip 확인: OPENDART_API_KEY 설정 없음
 - `./scripts/krx_kind_smoke` skip 확인: KRX_KIND_SMOKE_ENABLED 설정 없음
 - `./scripts/krx_price_smoke` skip 확인: KRX_PRICE_SMOKE_ENABLED 설정 없음
@@ -270,7 +270,7 @@
 - Goldilocks ODBC smoke 완료
 - Goldilocks TCP health는 compose dev 환경에서 `host.docker.internal:11100`으로 확인 완료
 - KRX Data Marketplace daily price smoke는 opt-in 실행 시 KRX download endpoint가 빈 price bars 반환
-- SEC EDGAR network smoke는 script 준비 완료, 현재 환경은 placeholder User-Agent
+- SEC EDGAR network smoke 완료: 실제 contact User-Agent 환경에서 AAPL disclosure metadata 응답 확인
 - OpenDART network smoke는 script 준비 완료, 현재 환경은 API key 없음
 - KRX KIND network smoke 완료
 - ECOS FX network smoke는 script 준비 완료, 현재 환경은 API key 없음
