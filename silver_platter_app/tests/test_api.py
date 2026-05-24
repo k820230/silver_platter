@@ -15,9 +15,11 @@ from silver_platter.api.main import (
     backtest_strategy_plugins,
     headline_risk_signals,
     HeadlineRiskSignalsRequest,
+    operations_backup_status,
     operations_provider_health,
     provider_catalog,
 )
+from silver_platter.backup import build_backup_manifest, write_backup_manifest
 from silver_platter.exports import export_price_bars_partitioned
 from silver_platter.providers import sample_bar
 
@@ -148,6 +150,42 @@ class ApiBoundaryTests(TestCase):
         self.assertTrue(ofac_policy["can_transform"])
         self.assertFalse(ofac_policy["can_display_realtime"])
         self.assertFalse(ofac_policy["can_redistribute"])
+
+    def test_backup_status_endpoint_reports_invalid_manifest_as_critical(self):
+        with TemporaryDirectory() as tmp:
+            Path(tmp, "manifest.json").write_text("{not-json", encoding="utf-8")
+
+            payload = operations_backup_status(backup_base_dir=tmp)
+
+        self.assertEqual("critical", payload["status"])
+        self.assertEqual("failed", payload["restore_status"])
+        self.assertEqual("unknown", payload["backup_status"])
+        self.assertIn("manifest is not valid json", payload["issues"])
+
+    def test_backup_status_endpoint_accepts_max_backup_age_days(self):
+        with TemporaryDirectory() as tmp:
+            base = Path(tmp)
+            data_file = base / "goldilocks" / "data" / "part.dat"
+            data_file.parent.mkdir(parents=True)
+            data_file.write_text("payload", encoding="utf-8")
+            write_backup_manifest(
+                build_backup_manifest(base, date.today()),
+                base / "manifest.json",
+            )
+
+            payload = operations_backup_status(
+                backup_base_dir=tmp,
+                max_backup_age_days=1,
+            )
+
+        self.assertEqual("ok", payload["status"])
+
+    def test_backup_status_endpoint_rejects_invalid_max_backup_age_days(self):
+        with self.assertRaises(HTTPException) as raised:
+            operations_backup_status(max_backup_age_days=0)
+
+        self.assertEqual(400, raised.exception.status_code)
+        self.assertIn("max_backup_age_days", raised.exception.detail)
 
     def test_headline_risk_signals_endpoint_deduplicates_and_maps_signal(self):
         payload = headline_risk_signals(

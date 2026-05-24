@@ -719,10 +719,18 @@ def operations_restore_check(request: RestoreCheckRequest) -> Dict[str, Any]:
 
 
 @app.get("/api/operations/backup-status")
-def operations_backup_status(backup_base_dir: Optional[str] = None) -> Dict[str, Any]:
+def operations_backup_status(
+    backup_base_dir: Optional[str] = None,
+    max_backup_age_days: int = 8,
+) -> Dict[str, Any]:
+    if max_backup_age_days < 1:
+        raise HTTPException(400, "max_backup_age_days must be at least 1")
     settings = AppSettings.from_env()
     base_dir = Path(backup_base_dir or settings.backup_base_dir)
-    return summarize_backup_restore_status(base_dir).as_dict()
+    return summarize_backup_restore_status(
+        base_dir,
+        max_backup_age_days=max_backup_age_days,
+    ).as_dict()
 
 
 @app.post("/api/audit/events")

@@ -104,8 +104,24 @@
 - provider catalog API
 - provider catalog migration seed consistency
 - backup
+- backup manifest/checksum self-file exclusion
+- backup manifest staging final-base-path recording
+- backup manifest checksum path-stable hash validation
+- in-progress backup manifest ignored by status discovery
+- backup restore check manifest checksum validation
+- backup restore check manifest checksum success path
+- backup wrapper configured command, no-fake-manifest skip, invalid-date preflight, root-dir guard, empty-output rejection, failed-rerun preservation, successful-rerun replacement, failure cleanup, and existing lock exit
 - backup execution lock
+- backup restore check empty/invalid manifest failure
+- backup restore check invalid manifest type failure
+- backup restore check path escape/directory entry failure
 - backup/restore status summary
+- stale backup status degradation
+- missing backup date status degradation
+- invalid backup date status degradation
+- backup status API invalid manifest critical response
+- backup status API max-age parameter validation
+- backup status API smoke response validation
 - audit
 - operations
 - provider health component mapping
@@ -118,7 +134,7 @@
 - G7 live safety gate evidence
 - migration coverage
 
-현재 테스트 수: 140개
+현재 테스트 수: 167개
 
 ## 7. 검증 증적
 

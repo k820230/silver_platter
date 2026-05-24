@@ -335,6 +335,24 @@ function providerLicenseSummary(
   return `${policy.license_name} store ${yesNo(policy.can_store)} transform ${yesNo(policy.can_transform)} realtime ${yesNo(policy.can_display_realtime)} redistribute ${yesNo(policy.can_redistribute)} priority ${provider.priority}`;
 }
 
+function backupStatusDetail(status: BackupStatusResponse): string {
+  const parts = status.latest_backup_date
+    ? [
+        `backup ${status.backup_status}`,
+        `restore ${status.restore_status}`,
+        `date ${status.latest_backup_date}`,
+      ]
+    : ["no backup manifest"];
+  if (status.lock_held) {
+    parts.push("lock held");
+  }
+  if (status.issue_count) {
+    parts.push(`${status.issue_count} issue${status.issue_count === 1 ? "" : "s"}`);
+    parts.push(status.issues.slice(0, 2).join("; "));
+  }
+  return parts.filter(Boolean).join(" | ");
+}
+
 function statusTone(value: string | undefined): string {
   const normalized = (value ?? "").toLowerCase();
   if (["ok", "pass", "ready", "accepted", "filled"].includes(normalized)) {
@@ -1027,11 +1045,7 @@ function App() {
               <div className="ops-row">
                 <span>backup_restore</span>
                 <strong className={statusTone(data.backupStatus.status)}>{statusLabel(data.backupStatus.status)}</strong>
-                <em>
-                  {data.backupStatus.latest_backup_date
-                    ? `backup ${data.backupStatus.backup_status}, restore ${data.backupStatus.restore_status}`
-                    : "no backup manifest"}
-                </em>
+                <em>{backupStatusDetail(data.backupStatus)}</em>
               </div>
             ) : null}
           </div>

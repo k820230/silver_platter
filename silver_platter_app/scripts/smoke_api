@@ -66,7 +66,14 @@ curl -fsS -X POST "${API_URL}/api/operations/summary" \
   -H 'Content-Type: application/json' \
   -d '{"components":[{"component":"api","status":"ok","detail":"ready","checked_at":"2026-05-22T10:00:00"}]}' >/dev/null
 
-curl -fsS "${API_URL}/api/operations/backup-status?backup_base_dir=${SNAPSHOT_DIR}" >/dev/null
+curl -fsS "${API_URL}/api/operations/backup-status?backup_base_dir=${SNAPSHOT_DIR}&max_backup_age_days=8" | python3 -c '
+import json
+import sys
+
+payload = json.load(sys.stdin)
+if payload["status"] != "degraded" or payload["backup_status"] != "missing":
+    raise SystemExit("unexpected empty backup status: %s" % payload)
+' >/dev/null
 
 curl -fsS "${API_URL}/api/operations/provider-health" >/dev/null
 

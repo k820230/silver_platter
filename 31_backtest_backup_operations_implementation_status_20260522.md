@@ -114,11 +114,34 @@
 - scenario result repository SQL generation
 - restore check repository SQL generation
 - backup manifest 생성
+- backup manifest/checksum self-file exclusion
+- backup manifest final base path recording for staging writes
+- backup manifest checksum path-stable hash 기록
+- in-progress backup manifest discovery 제외
 - backup execution lock 중복 acquire 방지
 - backup wrapper lock smoke
+- backup wrapper configured command manifest/restore smoke
+- backup wrapper skip without fake manifest
+- backup wrapper invalid date preflight
+- backup wrapper root base directory guard
+- backup wrapper command failure lock cleanup
+- backup wrapper failed rerun preserves existing dated backup
+- backup wrapper successful rerun replaces existing dated backup
+- backup wrapper empty successful command rejection
+- backup wrapper existing lock exit
 - backup/restore status missing/ok/critical 판정
+- stale backup degraded 판정
+- missing backup date degraded 판정
+- invalid backup date degraded 판정
 - restore check 성공
+- manifest checksum match 성공 검증
+- manifest checksum mismatch 실패 검출
 - checksum mismatch 실패 검출
+- empty backup manifest 실패 검출
+- invalid backup manifest JSON 실패 검출
+- invalid backup manifest root/files type 실패 검출
+- backup manifest base path escape 실패 검출
+- backup manifest directory entry 실패 검출
 - 토요일 10:00 다음 실행 시각 계산
 - 매월 restore drill 다음 실행 시각 계산
 - 31일 schedule의 짧은 달 마지막 일자 보정

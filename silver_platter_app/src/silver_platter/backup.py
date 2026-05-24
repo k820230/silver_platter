@@ -4,7 +4,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
-from typing import List, Optional
+from typing import Dict, List, Optional, Tuple
 
 
 @dataclass(frozen=True)
@@ -137,10 +137,12 @@ def build_backup_manifest(
     dbms: str = "goldilocks",
     status: str = "success",
     created_at: Optional[datetime] = None,
+    manifest_base_path: Optional[Path] = None,
 ) -> BackupManifest:
     files: List[BackupFileEntry] = []
+    excluded_names = {"manifest.json", "manifest.sha256", "checksum.sha256"}
     for path in sorted(base_path.rglob("*")):
-        if not path.is_file() or path.name == "manifest.json":
+        if not path.is_file() or path.name in excluded_names:
             continue
         files.append(
             BackupFileEntry(
@@ -153,7 +155,7 @@ def build_backup_manifest(
         backup_date=backup_date,
         dbms=dbms,
         backup_policy=policy_code,
-        base_path=str(base_path),
+        base_path=str(manifest_base_path or base_path),
         status=status,
         files=files,
         created_at=created_at or datetime.utcnow(),
@@ -178,11 +180,34 @@ def _manifest_sort_key(path: Path) -> tuple:
         return "", "", str(path)
 
 
+def _is_in_progress_backup_path(path: Path) -> bool:
+    return any(".in_progress." in part for part in path.parts)
+
+
 def find_latest_backup_manifest(base_path: Path) -> Optional[Path]:
     if not base_path.exists():
         return None
-    manifests = sorted(base_path.rglob("manifest.json"), key=_manifest_sort_key)
+    manifests = sorted(
+        [
+            path
+            for path in base_path.rglob("manifest.json")
+            if not _is_in_progress_backup_path(path)
+        ],
+        key=_manifest_sort_key,
+    )
     return manifests[-1] if manifests else None
+
+
+def _read_manifest_payload(manifest_path: Path) -> Tuple[Optional[Dict[str, object]], List[str]]:
+    try:
+        payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except OSError as exc:
+        return None, ["manifest cannot be read: %s" % exc]
+    except json.JSONDecodeError:
+        return None, ["manifest is not valid json"]
+    if not isinstance(payload, dict):
+        return None, ["manifest root is not an object"]
+    return payload, []
 
 
 def restore_check(manifest_path: Path) -> RestoreCheckResult:
@@ -195,19 +220,56 @@ def restore_check(manifest_path: Path) -> RestoreCheckResult:
             issue_count=1,
             issues=["manifest is missing"],
         )
-    payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+    payload, manifest_issues = _read_manifest_payload(manifest_path)
+    if payload is None:
+        return RestoreCheckResult(
+            status="failed",
+            checked_at=datetime.utcnow(),
+            manifest_path=str(manifest_path),
+            issue_count=len(manifest_issues),
+            issues=manifest_issues,
+        )
+    manifest_checksum_path = manifest_path.with_name("manifest.sha256")
+    if manifest_checksum_path.exists():
+        try:
+            expected_manifest_checksum = manifest_checksum_path.read_text(
+                encoding="utf-8"
+            ).strip().split()[0]
+        except (IndexError, OSError):
+            expected_manifest_checksum = ""
+        if expected_manifest_checksum != sha256_file(manifest_path):
+            issues.append("manifest checksum mismatch")
     base_path = Path(payload.get("base_path", manifest_path.parent))
+    base_path_resolved = base_path.resolve(strict=False)
     if payload.get("dbms") != "goldilocks":
         issues.append("manifest dbms is not goldilocks")
-    for entry in payload.get("files", []):
-        path = base_path / entry.get("relative_path", "")
+    files = payload.get("files", [])
+    if not isinstance(files, list):
+        issues.append("manifest files is not a list")
+        files = []
+    if not files:
+        issues.append("manifest has no backup files")
+    for entry in files:
+        if not isinstance(entry, dict):
+            issues.append("manifest file entry is not an object")
+            continue
+        relative_path = str(entry.get("relative_path", ""))
+        path = (base_path / relative_path).resolve(strict=False)
+        try:
+            path.relative_to(base_path_resolved)
+        except ValueError:
+            issues.append("backup file path escapes base: %s" % relative_path)
+            continue
         if not path.exists():
-            issues.append("missing backup file: %s" % entry.get("relative_path"))
+            issues.append("missing backup file: %s" % relative_path)
+            continue
+        if not path.is_file():
+            issues.append("backup path is not a file: %s" % relative_path)
             continue
         if path.stat().st_size != entry.get("size_bytes"):
-            issues.append("size mismatch: %s" % entry.get("relative_path"))
+            issues.append("size mismatch: %s" % relative_path)
         if sha256_file(path) != entry.get("sha256"):
-            issues.append("checksum mismatch: %s" % entry.get("relative_path"))
+            issues.append("checksum mismatch: %s" % relative_path)
     return RestoreCheckResult(
         status="ok" if not issues else "failed",
         checked_at=datetime.utcnow(),
@@ -221,6 +283,7 @@ def summarize_backup_restore_status(
     backup_base_dir: Path,
     lock_path: Optional[Path] = None,
     checked_at: Optional[datetime] = None,
+    max_backup_age_days: int = 8,
 ) -> BackupRestoreStatus:
     checked = checked_at or datetime.utcnow()
     lock_target = lock_path or (backup_base_dir / ".goldilocks_backup.lock")
@@ -242,10 +305,28 @@ def summarize_backup_restore_status(
             issues=issues,
         )
 
-    payload = json.loads(latest_manifest.read_text(encoding="utf-8"))
-    backup_status = str(payload.get("status", "unknown"))
     restore_result = restore_check(latest_manifest)
+    payload, _manifest_issues = _read_manifest_payload(latest_manifest)
+    if payload is None:
+        backup_status = "unknown"
+        latest_backup_date = None
+    else:
+        backup_status = str(payload.get("status", "unknown"))
+        latest_backup_date = payload.get("backup_date")
     issues.extend(restore_result.issues)
+    if payload is not None:
+        if not latest_backup_date:
+            issues.append("latest backup date is missing")
+        else:
+            try:
+                backup_age_days = (
+                    checked.date() - date.fromisoformat(str(latest_backup_date))
+                ).days
+            except ValueError:
+                issues.append("latest backup date is invalid: %s" % latest_backup_date)
+            else:
+                if backup_age_days > max_backup_age_days:
+                    issues.append("latest backup is stale: %s days old" % backup_age_days)
     if backup_status not in {"success", "ok"}:
         issues.append("latest backup status is %s" % backup_status)
 
@@ -260,7 +341,7 @@ def summarize_backup_restore_status(
         status=status,
         backup_base_dir=str(backup_base_dir),
         latest_manifest_path=str(latest_manifest),
-        latest_backup_date=payload.get("backup_date"),
+        latest_backup_date=latest_backup_date,
         backup_status=backup_status,
         restore_status=restore_result.status,
         lock_held=lock_held,
