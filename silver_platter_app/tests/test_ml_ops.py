@@ -6,10 +6,12 @@ from unittest import TestCase
 from silver_platter.data_quality import PriceBarInput
 from silver_platter.ml import FeatureSnapshot
 from silver_platter.ml_ops import (
+    InMemoryPredictionJobQueue,
     PredictionActual,
     WatchlistRegistry,
     attach_prediction_actual,
     create_prediction_job,
+    enqueue_prediction_job,
     match_due_prediction_actuals,
     run_prediction_job,
     summarize_prediction_errors,
@@ -67,6 +69,52 @@ class MlOpsTests(TestCase):
         self.assertEqual(1, len(predictions))
         self.assertEqual(1, summary.sample_count)
         self.assertGreater(summary.mean_absolute_error, 0)
+
+    def test_in_memory_prediction_job_queue_runs_fifo(self):
+        queue = InMemoryPredictionJobQueue()
+        job = create_prediction_job("job-queue", "AAPL", ["1d"])
+        snapshot = FeatureSnapshot(
+            security_id="AAPL",
+            as_of=datetime(2026, 5, 22, 9, 0, 0),
+            last_price=200.0,
+            avg_volume_20d=50_000_000,
+            annualized_volatility=0.30,
+            risk_score=30.0,
+        )
+
+        queued = queue.enqueue(job, snapshot)
+        predictions = queue.run_next()
+
+        self.assertEqual("job-queue", queued.job.job_id)
+        self.assertEqual(0, queue.pending_count())
+        self.assertEqual("job-queue-1d", predictions[0].prediction_id)
+        self.assertIsNone(queue.run_next())
+
+    def test_enqueue_prediction_job_uses_queue_enqueue_boundary(self):
+        class FakeQueue:
+            def __init__(self):
+                self.calls = []
+
+            def enqueue(self, fn, *args):
+                self.calls.append((fn, args))
+                return "queued"
+
+        queue = FakeQueue()
+        job = create_prediction_job("job-rq", "AAPL", ["1d"])
+        snapshot = FeatureSnapshot(
+            security_id="AAPL",
+            as_of=datetime(2026, 5, 22, 9, 0, 0),
+            last_price=200.0,
+            avg_volume_20d=50_000_000,
+            annualized_volatility=0.30,
+            risk_score=30.0,
+        )
+
+        result = enqueue_prediction_job(queue, job, snapshot)
+
+        self.assertEqual("queued", result)
+        self.assertIs(run_prediction_job, queue.calls[0][0])
+        self.assertEqual((job, snapshot), queue.calls[0][1])
 
     def test_match_due_prediction_actuals_uses_first_available_target_bar(self):
         job = create_prediction_job("job-2", "AAPL", ["1d"])

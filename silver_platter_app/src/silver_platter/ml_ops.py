@@ -107,6 +107,43 @@ class MlPredictionJob:
 
 
 @dataclass(frozen=True)
+class QueuedPredictionJob:
+    job: MlPredictionJob
+    snapshot: FeatureSnapshot
+    enqueued_at: datetime
+
+
+@dataclass
+class InMemoryPredictionJobQueue:
+    jobs: List[QueuedPredictionJob] = field(default_factory=list)
+
+    def enqueue(self, job: MlPredictionJob, snapshot: FeatureSnapshot) -> QueuedPredictionJob:
+        if job.security_id != snapshot.security_id:
+            raise ValueError("job security_id must match snapshot security_id")
+        queued = QueuedPredictionJob(
+            job=job,
+            snapshot=snapshot,
+            enqueued_at=datetime.utcnow(),
+        )
+        self.jobs.append(queued)
+        return queued
+
+    def dequeue(self) -> Optional[QueuedPredictionJob]:
+        if not self.jobs:
+            return None
+        return self.jobs.pop(0)
+
+    def run_next(self, registry: Optional[ModelRegistry] = None) -> Optional[List["StoredPrediction"]]:
+        queued = self.dequeue()
+        if queued is None:
+            return None
+        return run_prediction_job(queued.job, queued.snapshot, registry)
+
+    def pending_count(self) -> int:
+        return len(self.jobs)
+
+
+@dataclass(frozen=True)
 class StoredPrediction:
     prediction_id: str
     job_id: str
@@ -179,6 +216,12 @@ def run_prediction_job(
         )
         for prediction in predictions
     ]
+
+
+def enqueue_prediction_job(queue: object, job: MlPredictionJob, snapshot: FeatureSnapshot) -> object:
+    if job.security_id != snapshot.security_id:
+        raise ValueError("job security_id must match snapshot security_id")
+    return queue.enqueue(run_prediction_job, job, snapshot)
 
 
 def attach_prediction_actual(

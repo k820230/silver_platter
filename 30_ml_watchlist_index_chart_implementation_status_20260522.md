@@ -36,6 +36,8 @@
 - 기존 baseline prediction engine과 연결
 - job 결과를 stored prediction 모델로 변환
 - model registry artifact JSON 저장/복구
+- in-memory prediction job queue
+- RQ 호환 `queue.enqueue()` 경계 helper
 
 ### 3.3 Actual 연결과 오차 계산
 
@@ -87,6 +89,8 @@
 - watchlist API configured persistence
 - watchlist repository writer SQL generation
 - prediction job horizon filtering
+- in-memory ML job queue FIFO 실행
+- RQ enqueue boundary
 - model registry artifact round trip
 - stored prediction 생성
 - actual price 연결
@@ -101,7 +105,6 @@
 
 ## 5. 남은 실제 연동
 
-- ML job queue/RQ 연결
 - model performance dashboard
 
 ## 6. 검증 명령

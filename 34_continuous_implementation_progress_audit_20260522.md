@@ -94,6 +94,8 @@
 - OFAC Recent Actions headline metadata normalization
 - ML ops
 - model registry artifact persistence
+- ML job queue fallback
+- ML job RQ enqueue boundary
 - watchlist JSON persistence
 - watchlist API configured persistence
 - watchlist repository writer SQL generation
@@ -154,7 +156,7 @@
 - verification status UI card
 - migration coverage
 
-현재 테스트 수: 200개
+현재 테스트 수: 202개
 
 ## 7. 검증 증적
 
