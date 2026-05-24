@@ -1,4 +1,4 @@
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 import os
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
@@ -11,6 +11,11 @@ from silver_platter.business_groups import (
     normalized_group_volatility_changes,
 )
 from silver_platter.config import AppSettings, sec_edgar_user_agent_has_real_contact
+from silver_platter.history_prefetch import (
+    HistoricalPricePrefetcher,
+    infer_security_reference,
+)
+from silver_platter.migrations import connect_goldilocks_from_env
 from silver_platter.charting import IndexObservation, build_index_chart_series
 from silver_platter.data_quality import PriceBarInput, evaluate_price_bars
 from silver_platter.disclosures import (
@@ -33,7 +38,12 @@ from silver_platter.ml_ops import (
     run_prediction_job,
     summarize_prediction_errors,
 )
-from silver_platter.broker import KoreaInvestmentBrokerAdapter, PaperBrokerAdapter
+from silver_platter.broker import (
+    KoreaInvestmentBrokerAdapter,
+    KoreaInvestmentCredentials,
+    KoreaInvestmentHttpTransport,
+    PaperBrokerAdapter,
+)
 from silver_platter.risk_controls import headline_clusters_to_event_risk_signals
 from silver_platter.backtest import (
     BacktestRunConfig,
@@ -48,6 +58,7 @@ from silver_platter.replay import (
     ExportedSnapshotReplayConfig,
     run_exported_snapshot_replay,
 )
+from silver_platter.repository import GoldilocksRepository
 from silver_platter.strategies import DEFAULT_STRATEGY_REGISTRY, StrategyContext
 from silver_platter.audit import AuditLog, build_setting_change_detail
 from silver_platter.operations import (
@@ -56,6 +67,7 @@ from silver_platter.operations import (
     summarize_operations,
 )
 from silver_platter.providers import (
+    KoreaInvestmentDailyPriceProvider,
     default_mvp_provider_catalog,
     license_policy_from_provider,
 )
@@ -115,6 +127,18 @@ class WatchlistAddRequest(BaseModel):
     user_id: str
     security_id: str
     note: str = ""
+    market: str = ""
+    prefetch_history: bool = True
+    history_start_date: Optional[date] = None
+    history_end_date: Optional[date] = None
+
+
+class SecuritySearchRequest(BaseModel):
+    security_id: str
+    market: str = ""
+    prefetch_history: bool = True
+    history_start_date: Optional[date] = None
+    history_end_date: Optional[date] = None
 
 
 class ActualPriceBarRequest(BaseModel):
@@ -378,6 +402,119 @@ def _missing_provider_settings(settings: AppSettings) -> List[str]:
     return missing
 
 
+def _history_prefetch_skip(
+    security_id: str,
+    status: str,
+    detail: str,
+    market_code: str = "",
+    provider_code: str = "",
+) -> Dict[str, Any]:
+    return {
+        "security_id": security_id,
+        "market_code": market_code,
+        "provider_code": provider_code,
+        "status": status,
+        "is_new_security": False,
+        "bar_count": 0,
+        "existing_bar_count": 0,
+        "quality_status": "",
+        "storage_uri": "",
+        "detail": detail,
+    }
+
+
+def _history_prefetch_date_range(
+    start_date: Optional[date],
+    end_date: Optional[date],
+) -> Tuple[date, date]:
+    end = end_date or date.today()
+    if start_date is None:
+        lookback_days = int(os.getenv("HISTORY_PREFETCH_LOOKBACK_DAYS", "365"))
+        start = end - timedelta(days=max(1, lookback_days))
+    else:
+        start = start_date
+    if start > end:
+        raise ValueError("history_start_date must be on or before history_end_date")
+    return start, end
+
+
+def _prefetch_history_for_security(
+    security_id: str,
+    market: str,
+    start_date: Optional[date],
+    end_date: Optional[date],
+    enabled: bool = True,
+) -> Dict[str, Any]:
+    security = infer_security_reference(security_id, market)
+    if not enabled:
+        return _history_prefetch_skip(
+            security.symbol,
+            "skipped_disabled",
+            "history prefetch disabled for request",
+            market_code=security.market_code,
+        )
+    if security.market_code != "KR":
+        return _history_prefetch_skip(
+            security.symbol,
+            "skipped_unsupported_market",
+            "automatic stock-info prefetch currently supports KR domestic stocks",
+            market_code=security.market_code,
+        )
+
+    settings = AppSettings.from_env()
+    if not settings.kis.configured_for_queries():
+        return _history_prefetch_skip(
+            security.symbol,
+            "skipped_provider_unconfigured",
+            "KIS query credentials are not configured",
+            market_code=security.market_code,
+            provider_code="kis_domestic_daily_price",
+        )
+
+    try:
+        start, end = _history_prefetch_date_range(start_date, end_date)
+        connection = connect_goldilocks_from_env()
+        provider = KoreaInvestmentDailyPriceProvider(
+            KoreaInvestmentCredentials(
+                app_key=settings.kis.app_key,
+                app_secret=settings.kis.app_secret,
+                account_number=settings.kis.account_number,
+                account_product_code=settings.kis.account_product_code,
+                trading_env=settings.kis.trading_env,
+            ),
+            KoreaInvestmentHttpTransport(settings.kis.api_base_url),
+            start_date=start,
+            end_date=end,
+            access_token=os.getenv("KIS_ACCESS_TOKEN", "").strip() or None,
+        )
+        result = HistoricalPricePrefetcher(
+            GoldilocksRepository(connection)
+        ).prefetch(
+            security.symbol,
+            provider,
+            market_code=security.market_code,
+            start_date=start,
+            end_date=end,
+        )
+        return result.as_dict()
+    except ValueError as exc:
+        return _history_prefetch_skip(
+            security.symbol,
+            "skipped_unconfigured",
+            str(exc),
+            market_code=security.market_code,
+            provider_code="kis_domestic_daily_price",
+        )
+    except Exception as exc:
+        return _history_prefetch_skip(
+            security.symbol,
+            "failed",
+            str(exc),
+            market_code=security.market_code,
+            provider_code="kis_domestic_daily_price",
+        )
+
+
 @app.get("/health")
 def health() -> Dict[str, Any]:
     return get_health(AppSettings.from_env())
@@ -461,9 +598,48 @@ def ml_predictions(request: MlPredictionRequest) -> Dict[str, Any]:
 @app.post("/api/watchlist/items")
 def watchlist_add(request: WatchlistAddRequest) -> Dict[str, Any]:
     _ensure_watchlists_loaded()
+    existing = WATCHLISTS.items.get((request.user_id, request.security_id))
+    already_active = existing is not None and existing.is_active
     item = WATCHLISTS.add(request.user_id, request.security_id, request.note)
     _save_watchlists_if_configured()
-    return item.__dict__
+    if already_active:
+        history_prefetch = _history_prefetch_skip(
+            request.security_id,
+            "skipped_existing_watchlist",
+            "security already exists in the active watchlist",
+            market_code=request.market,
+        )
+    else:
+        history_prefetch = _prefetch_history_for_security(
+            request.security_id,
+            request.market,
+            request.history_start_date,
+            request.history_end_date,
+            enabled=request.prefetch_history,
+        )
+    return {**item.__dict__, "history_prefetch": history_prefetch}
+
+
+@app.post("/api/securities/search")
+def security_search(request: SecuritySearchRequest) -> Dict[str, Any]:
+    security = infer_security_reference(request.security_id, request.market)
+    history_prefetch = _prefetch_history_for_security(
+        request.security_id,
+        request.market,
+        request.history_start_date,
+        request.history_end_date,
+        enabled=request.prefetch_history,
+    )
+    return {
+        "security": {
+            "security_id": security.symbol,
+            "provider_symbol": security.provider_symbol,
+            "market_code": security.market_code,
+            "currency": security.currency,
+            "exchange_code": security.exchange_code,
+        },
+        "history_prefetch": history_prefetch,
+    }
 
 
 @app.delete("/api/watchlist/items/{user_id}/{security_id}")

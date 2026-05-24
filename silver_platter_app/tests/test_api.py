@@ -24,6 +24,8 @@ from silver_platter.api.main import (
     operations_backup_status,
     operations_provider_health,
     provider_catalog,
+    security_search,
+    SecuritySearchRequest,
     SettingChangeAuditRequest,
     watchlist_add,
     watchlist_list,
@@ -271,6 +273,62 @@ class ApiBoundaryTests(TestCase):
         self.assertEqual("core", listed["items"][0]["note"])
         self.assertTrue(removed["removed"])
         self.assertEqual([], listed_after_remove["items"])
+
+    def test_watchlist_add_prefetches_history_for_new_security(self):
+        api_main.WATCHLISTS = WatchlistRegistry()
+        api_main.WATCHLIST_STORE_LOADED_FROM = None
+        with patch.object(
+            api_main,
+            "_prefetch_history_for_security",
+            return_value={"status": "stored", "bar_count": 10},
+        ) as prefetch:
+            payload = watchlist_add(
+                WatchlistAddRequest(
+                    user_id="u1",
+                    security_id="005930.KS",
+                    market="KR",
+                )
+            )
+
+        self.assertEqual("stored", payload["history_prefetch"]["status"])
+        prefetch.assert_called_once()
+        self.assertEqual("005930.KS", prefetch.call_args.args[0])
+        self.assertEqual("KR", prefetch.call_args.args[1])
+
+    def test_watchlist_add_skips_prefetch_for_existing_active_security(self):
+        api_main.WATCHLISTS = WatchlistRegistry()
+        api_main.WATCHLIST_STORE_LOADED_FROM = None
+        watchlist_add(
+            WatchlistAddRequest(
+                user_id="u1",
+                security_id="AAPL",
+                prefetch_history=False,
+            )
+        )
+
+        payload = watchlist_add(WatchlistAddRequest(user_id="u1", security_id="AAPL"))
+
+        self.assertEqual(
+            "skipped_existing_watchlist",
+            payload["history_prefetch"]["status"],
+        )
+
+    def test_security_search_can_prefetch_history(self):
+        with patch.object(
+            api_main,
+            "_prefetch_history_for_security",
+            return_value={"status": "stored", "bar_count": 10},
+        ) as prefetch:
+            payload = security_search(
+                SecuritySearchRequest(
+                    security_id="005930.KS",
+                    market="KR",
+                )
+            )
+
+        self.assertEqual("005930", payload["security"]["security_id"])
+        self.assertEqual("stored", payload["history_prefetch"]["status"])
+        prefetch.assert_called_once()
 
     def test_ml_job_run_matches_actual_bars_when_observed(self):
         payload = ml_job_run(
