@@ -65,6 +65,35 @@ class GoldilocksRepository:
             ),
         )
 
+    def get_provider_id(self, provider_code: str) -> Optional[int]:
+        cursor = self._execute(
+            "SELECT provider_id FROM SP.data_provider WHERE provider_code = ?",
+            (provider_code,),
+        )
+        row = _fetch_one(cursor)
+        return None if row is None else int(row[0])
+
+    def ensure_provider_id(
+        self,
+        provider: ProviderMetadata,
+        provider_name: Optional[str] = None,
+        base_url: Optional[str] = None,
+        auth_type: Optional[str] = None,
+    ) -> int:
+        self.upsert_provider(
+            provider,
+            provider_name=provider_name,
+            base_url=base_url,
+            auth_type=auth_type,
+        )
+        provider_id = self.get_provider_id(provider.provider_code)
+        if provider_id is None:
+            raise RuntimeError(
+                "provider was not available after upsert: %s"
+                % provider.provider_code
+            )
+        return provider_id
+
     def upsert_security_reference(self, security: SecurityReference) -> None:
         self._execute(
             """
@@ -96,6 +125,28 @@ class GoldilocksRepository:
                 security.symbol,
             ),
         )
+
+    def get_security_id(self, market_code: str, symbol: str) -> Optional[int]:
+        cursor = self._execute(
+            """
+            SELECT security_id
+            FROM SP.security_master
+            WHERE market_code = ? AND symbol = ?
+            """,
+            (market_code, symbol),
+        )
+        row = _fetch_one(cursor)
+        return None if row is None else int(row[0])
+
+    def ensure_security_id(self, security: SecurityReference) -> int:
+        self.upsert_security_reference(security)
+        security_id = self.get_security_id(security.market_code, security.symbol)
+        if security_id is None:
+            raise RuntimeError(
+                "security was not available after upsert: %s/%s"
+                % (security.market_code, security.symbol)
+            )
+        return security_id
 
     def insert_data_license(
         self,
@@ -236,7 +287,15 @@ class GoldilocksRepository:
                 turnover_krw,
                 available_to_model_at
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?
+            FROM DUAL
+            WHERE NOT EXISTS (
+                SELECT 1 FROM SP.price_bar
+                WHERE security_id = ?
+                  AND provider_id = ?
+                  AND bar_interval = ?
+                  AND bar_ts = ?
+            )
             """,
             (
                 security_id,
@@ -248,8 +307,31 @@ class GoldilocksRepository:
                 bar.volume,
                 bar.turnover_krw,
                 bar.available_to_model_at,
+                security_id,
+                provider_id,
+                bar_interval,
+                bar.bar_ts,
             ),
         )
+
+    def count_price_bars(
+        self,
+        security_id: int,
+        provider_id: int,
+        bar_interval: str = "1d",
+    ) -> int:
+        cursor = self._execute(
+            """
+            SELECT COUNT(*)
+            FROM SP.price_bar
+            WHERE security_id = ?
+              AND provider_id = ?
+              AND bar_interval = ?
+            """,
+            (security_id, provider_id, bar_interval),
+        )
+        row = _fetch_one(cursor)
+        return 0 if row is None else int(row[0])
 
     def write_price_bar_ingestion(
         self,
@@ -880,6 +962,13 @@ def _should_inline_params(connection: object) -> bool:
     if os.getenv("GOLDILOCKS_INLINE_SQL_PARAMS", "").strip() == "1":
         return True
     return connection.__class__.__module__ == "pyodbc"
+
+
+def _fetch_one(cursor: object) -> Optional[object]:
+    fetchone = getattr(cursor, "fetchone", None)
+    if fetchone is None:
+        raise RuntimeError("cursor does not support fetchone")
+    return fetchone()
 
 
 def _is_parameter_binding_unsupported(exc: Exception) -> bool:

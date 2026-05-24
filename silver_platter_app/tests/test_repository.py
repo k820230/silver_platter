@@ -44,11 +44,17 @@ class FakeCursor:
         self.connection.commands.append((sql, params))
         return self
 
+    def fetchone(self):
+        if not self.connection.fetchone_results:
+            return None
+        return self.connection.fetchone_results.pop(0)
+
 
 class FakeConnection:
     def __init__(self):
         self.commands = []
         self.commits = 0
+        self.fetchone_results = []
 
     def cursor(self):
         return FakeCursor(self)
@@ -95,6 +101,19 @@ class RepositoryTests(TestCase):
         self.assertEqual("sec_edgar", params[0])
         self.assertEqual("sec_edgar", params[-1])
 
+    def test_ensure_provider_id_upserts_and_reads_id(self):
+        connection = FakeConnection()
+        connection.fetchone_results = [(7,)]
+        repository = GoldilocksRepository(connection)
+
+        provider_id = repository.ensure_provider_id(
+            ProviderMetadata("krx_data", "market_data", True, False, False)
+        )
+
+        self.assertEqual(7, provider_id)
+        self.assertIn("INSERT INTO SP.data_provider", connection.commands[0][0])
+        self.assertIn("SELECT provider_id", connection.commands[1][0])
+
     def test_upsert_security_reference_uses_market_symbol_key(self):
         connection = FakeConnection()
         repository = GoldilocksRepository(connection)
@@ -117,6 +136,28 @@ class RepositoryTests(TestCase):
         self.assertIn("FROM DUAL", sql)
         self.assertIn("market_code = ? AND symbol = ?", sql)
         self.assertEqual(("US", "AAPL"), params[-2:])
+
+    def test_ensure_security_id_upserts_and_reads_id(self):
+        connection = FakeConnection()
+        connection.fetchone_results = [(11,)]
+        repository = GoldilocksRepository(connection)
+
+        security_id = repository.ensure_security_id(
+            SecurityReference(
+                symbol="005930",
+                security_name="005930",
+                market_code="KR",
+                country_code="KOR",
+                currency="KRW",
+                asset_type="stock",
+                exchange_code="KRX",
+                provider_symbol="005930",
+            )
+        )
+
+        self.assertEqual(11, security_id)
+        self.assertIn("INSERT INTO SP.security_master", connection.commands[0][0])
+        self.assertIn("SELECT security_id", connection.commands[1][0])
 
     def test_execute_inlines_params_when_driver_rejects_binding(self):
         connection = BindingUnsupportedConnection()
@@ -187,6 +228,18 @@ class RepositoryTests(TestCase):
         self.assertEqual(1, connection.commits)
         self.assertEqual(11, connection.commands[-1][1][0])
         self.assertEqual(7, connection.commands[-1][1][1])
+        self.assertIn("WHERE NOT EXISTS", connection.commands[-1][0])
+
+    def test_count_price_bars_reads_existing_rows(self):
+        connection = FakeConnection()
+        connection.fetchone_results = [(3,)]
+        repository = GoldilocksRepository(connection)
+
+        count = repository.count_price_bars(11, 7)
+
+        self.assertEqual(3, count)
+        self.assertIn("SELECT COUNT(*)", connection.commands[0][0])
+        self.assertEqual((11, 7, "1d"), connection.commands[0][1])
 
     def test_insert_user_watchlist_item_and_deactivate(self):
         registry = WatchlistRegistry()
