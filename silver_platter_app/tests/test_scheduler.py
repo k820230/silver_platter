@@ -1,4 +1,5 @@
 from datetime import date, datetime
+import json
 from pathlib import Path
 from subprocess import CompletedProcess
 from tempfile import TemporaryDirectory
@@ -9,10 +10,12 @@ from silver_platter.worker.scheduler import (
     MVP_BACKUP_SCHEDULE,
     MVP_RESTORE_DRILL_SCHEDULE,
     MonthlySchedule,
+    latest_monthly_run_at,
     latest_weekly_run_at,
     next_monthly_run_after,
     next_weekly_run_after,
     run_due_backup_once,
+    run_due_restore_drill_once,
     scheduler_now,
     scheduler_timezone,
 )
@@ -72,6 +75,22 @@ class SchedulerTests(TestCase):
         )
 
         self.assertEqual(datetime(2026, 2, 28, 10, 0, 0), result)
+
+    def test_latest_monthly_run_at_returns_previous_month_before_schedule(self):
+        result = latest_monthly_run_at(
+            datetime(2026, 5, 1, 10, 0, 0),
+            MVP_RESTORE_DRILL_SCHEDULE,
+        )
+
+        self.assertEqual(datetime(2026, 4, 1, 11, 0, 0), result)
+
+    def test_latest_monthly_run_at_returns_same_month_after_schedule(self):
+        result = latest_monthly_run_at(
+            datetime(2026, 5, 1, 11, 1, 0),
+            MVP_RESTORE_DRILL_SCHEDULE,
+        )
+
+        self.assertEqual(datetime(2026, 5, 1, 11, 0, 0), result)
 
     def test_scheduler_now_uses_configured_timezone(self):
         result = scheduler_now("Asia/Seoul")
@@ -180,3 +199,63 @@ class SchedulerTests(TestCase):
         self.assertEqual("failed", result.status)
         self.assertEqual(42, result.exit_code)
         self.assertEqual("backup failed", result.detail)
+
+    def test_run_due_restore_drill_once_writes_success_evidence(self):
+        with TemporaryDirectory() as tmp:
+            base = Path(tmp)
+            data = base / "goldilocks" / "data" / "part.dat"
+            data.parent.mkdir(parents=True)
+            data.write_text("payload", encoding="utf-8")
+            manifest_path = base / "manifest.json"
+            write_backup_manifest(
+                build_backup_manifest(base, date(2026, 4, 30)),
+                manifest_path,
+            )
+            evidence_path = base / ".restore_drill_runs" / "2026-05-01.json"
+
+            result = run_due_restore_drill_once(
+                datetime(2026, 5, 1, 12, 0, 0),
+                base,
+                evidence_path=evidence_path,
+            )
+            evidence = json.loads(evidence_path.read_text(encoding="utf-8"))
+
+        self.assertEqual("completed", result.status)
+        self.assertEqual("ok", evidence["status"])
+        self.assertEqual(str(manifest_path), evidence["manifest_path"])
+        self.assertEqual(0, evidence["issue_count"])
+
+    def test_run_due_restore_drill_once_skips_existing_success_evidence(self):
+        with TemporaryDirectory() as tmp:
+            base = Path(tmp)
+            evidence_path = base / ".restore_drill_runs" / "2026-05-01.json"
+            evidence_path.parent.mkdir(parents=True)
+            evidence_path.write_text(
+                json.dumps({"status": "ok"}),
+                encoding="utf-8",
+            )
+
+            result = run_due_restore_drill_once(
+                datetime(2026, 5, 1, 12, 0, 0),
+                base,
+                evidence_path=evidence_path,
+            )
+
+        self.assertEqual("skipped", result.status)
+        self.assertIn("already passed", result.detail)
+
+    def test_run_due_restore_drill_once_records_missing_manifest_failure(self):
+        with TemporaryDirectory() as tmp:
+            base = Path(tmp)
+            evidence_path = base / ".restore_drill_runs" / "2026-05-01.json"
+
+            result = run_due_restore_drill_once(
+                datetime(2026, 5, 1, 12, 0, 0),
+                base,
+                evidence_path=evidence_path,
+            )
+            evidence = json.loads(evidence_path.read_text(encoding="utf-8"))
+
+        self.assertEqual("failed", result.status)
+        self.assertEqual("failed", evidence["status"])
+        self.assertEqual(["backup manifest is missing"], evidence["issues"])

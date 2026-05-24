@@ -1,12 +1,17 @@
 from dataclasses import dataclass
 import calendar
 from datetime import datetime, timedelta, timezone
+import json
 import os
 from pathlib import Path
 import subprocess
 from typing import Callable, Dict, Optional
 
-from silver_platter.backup import find_latest_backup_manifest, _read_manifest_payload
+from silver_platter.backup import (
+    find_latest_backup_manifest,
+    restore_check,
+    _read_manifest_payload,
+)
 from silver_platter.config import AppSettings
 
 
@@ -120,6 +125,34 @@ def next_monthly_run_after(
     return candidate
 
 
+def latest_monthly_run_at(
+    now: datetime,
+    schedule: MonthlySchedule = MVP_RESTORE_DRILL_SCHEDULE,
+) -> datetime:
+    candidate = now.replace(
+        day=_scheduled_day(now.year, now.month, schedule.day),
+        hour=schedule.hour,
+        minute=schedule.minute,
+        second=0,
+        microsecond=0,
+    )
+    if candidate <= now:
+        return candidate
+    if now.month == 1:
+        year, month = now.year - 1, 12
+    else:
+        year, month = now.year, now.month - 1
+    return now.replace(
+        year=year,
+        month=month,
+        day=_scheduled_day(year, month, schedule.day),
+        hour=schedule.hour,
+        minute=schedule.minute,
+        second=0,
+        microsecond=0,
+    )
+
+
 def scheduler_timezone(timezone_name: str) -> timezone:
     if timezone_name == "Asia/Seoul":
         return timezone(timedelta(hours=9), timezone_name)
@@ -145,6 +178,45 @@ def _latest_backup_date(backup_base_dir: Path) -> Optional[str]:
         return None
     backup_date = payload.get("backup_date")
     return str(backup_date) if backup_date else None
+
+
+def _restore_drill_evidence_path(backup_base_dir: Path, scheduled_at: datetime) -> Path:
+    return (
+        backup_base_dir
+        / ".restore_drill_runs"
+        / ("%s.json" % scheduled_at.date().isoformat())
+    )
+
+
+def _restore_drill_completed(evidence_path: Path) -> bool:
+    try:
+        payload = json.loads(evidence_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return False
+    return payload.get("status") == "ok"
+
+
+def _write_restore_drill_evidence(
+    evidence_path: Path,
+    scheduled_at: datetime,
+    completed_at: datetime,
+    manifest_path: Optional[Path],
+    status: str,
+    issues: list,
+) -> None:
+    evidence_path.parent.mkdir(parents=True, exist_ok=True)
+    payload = {
+        "scheduled_at": scheduled_at.isoformat(),
+        "completed_at": completed_at.isoformat(),
+        "manifest_path": str(manifest_path) if manifest_path else None,
+        "status": status,
+        "issue_count": len(issues),
+        "issues": issues,
+    }
+    evidence_path.write_text(
+        json.dumps(payload, ensure_ascii=True, sort_keys=True, indent=2),
+        encoding="utf-8",
+    )
 
 
 def run_due_backup_once(
@@ -196,14 +268,78 @@ def run_due_backup_once(
     )
 
 
+def run_due_restore_drill_once(
+    now: datetime,
+    backup_base_dir: Path,
+    evidence_path: Optional[Path] = None,
+) -> SchedulerJobResult:
+    scheduled_at = latest_monthly_run_at(now)
+    target_evidence_path = evidence_path or _restore_drill_evidence_path(
+        backup_base_dir,
+        scheduled_at,
+    )
+    if _restore_drill_completed(target_evidence_path):
+        return SchedulerJobResult(
+            job="monthly_restore_drill",
+            status="skipped",
+            scheduled_at=scheduled_at,
+            completed_at=now,
+            exit_code=None,
+            detail="restore drill already passed for %s" % scheduled_at.date().isoformat(),
+        )
+
+    completed_at = scheduler_now(MVP_RESTORE_DRILL_SCHEDULE.timezone)
+    manifest_path = find_latest_backup_manifest(backup_base_dir)
+    if manifest_path is None:
+        issues = ["backup manifest is missing"]
+        _write_restore_drill_evidence(
+            target_evidence_path,
+            scheduled_at,
+            completed_at,
+            None,
+            "failed",
+            issues,
+        )
+        return SchedulerJobResult(
+            job="monthly_restore_drill",
+            status="failed",
+            scheduled_at=scheduled_at,
+            completed_at=completed_at,
+            exit_code=None,
+            detail=issues[0],
+        )
+
+    result = restore_check(manifest_path)
+    _write_restore_drill_evidence(
+        target_evidence_path,
+        scheduled_at,
+        completed_at,
+        manifest_path,
+        result.status,
+        result.issues,
+    )
+    return SchedulerJobResult(
+        job="monthly_restore_drill",
+        status="completed" if result.status == "ok" else "failed",
+        scheduled_at=scheduled_at,
+        completed_at=completed_at,
+        exit_code=None,
+        detail="restore check %s for %s" % (result.status, manifest_path),
+    )
+
+
 def main() -> None:
     settings = AppSettings.from_env()
     now = scheduler_now(settings.app_timezone)
     next_backup = next_weekly_run_after(now)
     next_restore_drill = next_monthly_run_after(now)
     backup_result = run_due_backup_once(now, Path(settings.backup_base_dir))
+    restore_drill_result = run_due_restore_drill_once(
+        now,
+        Path(settings.backup_base_dir),
+    )
     print(
-        "silver_platter scheduler ready timezone=%s backup_base_dir=%s now=%s next_backup=%s next_restore_drill=%s backup_job=%s"
+        "silver_platter scheduler ready timezone=%s backup_base_dir=%s now=%s next_backup=%s next_restore_drill=%s backup_job=%s restore_drill=%s"
         % (
             settings.app_timezone,
             settings.backup_base_dir,
@@ -211,6 +347,7 @@ def main() -> None:
             next_backup.isoformat(),
             next_restore_drill.isoformat(),
             backup_result,
+            restore_drill_result,
         )
     )
 
