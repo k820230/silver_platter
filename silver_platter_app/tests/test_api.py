@@ -62,6 +62,7 @@ class ApiBoundaryTests(TestCase):
                         "security_id": "005930",
                         "market": "KR",
                         "bar_count": 300,
+                        "latest_close_price": 203000.0,
                     }
                 ][:limit]
 
@@ -74,6 +75,7 @@ class ApiBoundaryTests(TestCase):
             payload = price_history_securities(limit=20)
 
         self.assertEqual("005930", payload["items"][0]["security_id"])
+        self.assertEqual(203000.0, payload["items"][0]["latest_close_price"])
         self.assertTrue(connection.closed)
 
     def test_price_history_risk_chart_returns_db_backed_chart(self):

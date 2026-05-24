@@ -342,6 +342,7 @@ class GoldilocksRepository:
                 sm.security_name,
                 sm.market_code,
                 sm.exchange_code,
+                dp.provider_id,
                 dp.provider_code,
                 dp.provider_name,
                 pb.bar_interval,
@@ -359,6 +360,7 @@ class GoldilocksRepository:
                 sm.security_name,
                 sm.market_code,
                 sm.exchange_code,
+                dp.provider_id,
                 dp.provider_code,
                 dp.provider_name,
                 pb.bar_interval
@@ -369,6 +371,7 @@ class GoldilocksRepository:
         rows = _fetch_all(cursor)
         items: List[Dict[str, object]] = []
         for row in rows[:limit]:
+            latest = self._get_latest_price_bar_snapshot(int(row[0]), int(row[5]), str(row[8]))
             items.append(
                 {
                     "security_db_id": int(row[0]),
@@ -376,15 +379,42 @@ class GoldilocksRepository:
                     "security_name": str(row[2]),
                     "market": str(row[3]),
                     "exchange_code": "" if row[4] is None else str(row[4]),
-                    "provider_code": str(row[5]),
-                    "provider_name": str(row[6]),
-                    "bar_interval": str(row[7]),
-                    "bar_count": int(row[8]),
-                    "first_bar_ts": _iso_datetime(row[9]),
-                    "latest_bar_ts": _iso_datetime(row[10]),
+                    "provider_code": str(row[6]),
+                    "provider_name": str(row[7]),
+                    "bar_interval": str(row[8]),
+                    "bar_count": int(row[9]),
+                    "first_bar_ts": _iso_datetime(row[10]),
+                    "latest_bar_ts": _iso_datetime(row[11]),
+                    "latest_close_price": latest["close_price"],
+                    "latest_volume": latest["volume"],
                 }
             )
         return items
+
+    def _get_latest_price_bar_snapshot(
+        self,
+        security_id: int,
+        provider_id: int,
+        bar_interval: str,
+    ) -> Dict[str, Optional[float]]:
+        cursor = self._execute(
+            """
+            SELECT close_price, volume
+            FROM SP.price_bar
+            WHERE security_id = ?
+              AND provider_id = ?
+              AND bar_interval = ?
+            ORDER BY bar_ts DESC
+            """,
+            (security_id, provider_id, bar_interval),
+        )
+        row = _fetch_one(cursor)
+        if row is None:
+            return {"close_price": None, "volume": None}
+        return {
+            "close_price": _number_or_none(row[0]),
+            "volume": _number_or_none(row[1]),
+        }
 
     def get_price_history_bars(
         self,

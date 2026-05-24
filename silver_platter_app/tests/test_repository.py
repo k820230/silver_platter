@@ -266,6 +266,7 @@ class RepositoryTests(TestCase):
                     "Samsung Electronics",
                     "KR",
                     "KRX",
+                    7,
                     "kis_domestic_daily_price",
                     "KIS",
                     "1d",
@@ -275,12 +276,15 @@ class RepositoryTests(TestCase):
                 )
             ]
         ]
+        connection.fetchone_results = [(203000, 1200000)]
         repository = GoldilocksRepository(connection)
 
         items = repository.list_price_history_securities(limit=20)
 
         self.assertEqual("005930", items[0]["security_id"])
         self.assertEqual(300, items[0]["bar_count"])
+        self.assertEqual(203000.0, items[0]["latest_close_price"])
+        self.assertEqual(1200000.0, items[0]["latest_volume"])
         self.assertEqual("kis_domestic_daily_price", items[0]["provider_code"])
         self.assertIn("GROUP BY", connection.commands[0][0])
 

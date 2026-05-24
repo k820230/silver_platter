@@ -304,6 +304,8 @@ type PriceHistorySecurity = {
   bar_count: number;
   first_bar_ts: string;
   latest_bar_ts: string;
+  latest_close_price: number | null;
+  latest_volume: number | null;
 };
 
 type PriceHistorySecuritiesResponse = {
@@ -362,6 +364,7 @@ type DashboardData = {
 type RecentPreviewSecurity = {
   securityId: string;
   market: string;
+  price: number | null;
 };
 
 type OrderForm = {
@@ -588,6 +591,11 @@ function loadRecentPreviewSecurities(): RecentPreviewSecurity[] {
     }
     return parsed
       .filter((item) => item && item.securityId && item.market)
+      .map((item) => ({
+        securityId: item.securityId,
+        market: item.market,
+        price: typeof item.price === "number" && Number.isFinite(item.price) ? item.price : null,
+      }))
       .slice(0, RECENT_PREVIEW_SECURITIES_LIMIT);
   } catch {
     return [];
@@ -611,11 +619,15 @@ function nextRecentPreviewSecurities(
 ): RecentPreviewSecurity[] {
   const securityId = (form.securityId.trim() || DEFAULT_ORDER.securityId).toUpperCase();
   const market = (form.market || DEFAULT_ORDER.market).toUpperCase();
+  const price = toNumber(form.price, 0);
   const deduped = current.filter(
     (item) =>
       item.securityId.toUpperCase() !== securityId || item.market.toUpperCase() !== market,
   );
-  return [{ securityId, market }, ...deduped].slice(0, RECENT_PREVIEW_SECURITIES_LIMIT);
+  return [
+    { securityId, market, price: price > 0 ? price : null },
+    ...deduped,
+  ].slice(0, RECENT_PREVIEW_SECURITIES_LIMIT);
 }
 
 function orderPayload(form: OrderForm) {
@@ -1247,10 +1259,12 @@ function App() {
   ]);
 
   const selectHistorySecurity = (security: PriceHistorySecurity) => {
+    const latestPrice = security.latest_close_price;
     const nextForm = {
       ...form,
       securityId: security.security_id,
       market: security.market,
+      price: latestPrice && latestPrice > 0 ? String(latestPrice) : form.price,
     };
     setSelectedHistorySecurity(security);
     setForm(nextForm);
@@ -1318,14 +1332,21 @@ function App() {
     }
   };
 
-  const applySecurityToPreview = (securityId: string, market: string) => {
-    setHistoryPrefetch(null);
-    setHistoryState("idle");
-    setForm((current) => ({
-      ...current,
+  const applySecurityToPreview = (
+    securityId: string,
+    market: string,
+    price: number | null = null,
+  ) => {
+    const nextForm = {
+      ...form,
       securityId,
       market,
-    }));
+      price: price && price > 0 ? String(price) : form.price,
+    };
+    setHistoryPrefetch(null);
+    setHistoryState("idle");
+    setForm(nextForm);
+    void refresh(nextForm);
   };
 
   const priceRanges = preview?.price_ranges ?? [];
@@ -1441,7 +1462,9 @@ function App() {
                         type="button"
                         className="volume-row"
                         key={`${market.market}-${item.symbol}-${item.exchange_code}`}
-                        onClick={() => applySecurityToPreview(item.symbol, market.market)}
+                        onClick={() =>
+                          applySecurityToPreview(item.symbol, market.market, item.last_price)
+                        }
                         title={`Set ${item.symbol} in Order Preview`}
                       >
                         <span>{item.rank}</span>
@@ -1471,11 +1494,12 @@ function App() {
                   type="button"
                   key={`${item.market}-${item.securityId}`}
                   className="recent-security-button"
-                  onClick={() => applySecurityToPreview(item.securityId, item.market)}
+                  onClick={() => applySecurityToPreview(item.securityId, item.market, item.price)}
                   title={`Set ${item.securityId} in Order Preview`}
                 >
                   <strong>{item.securityId}</strong>
                   <span>{item.market}</span>
+                  {item.price ? <em>{formatNumber(item.price, 2)}</em> : null}
                 </button>
               ))
             ) : (
@@ -1566,7 +1590,12 @@ function App() {
                     <strong>{security.security_id}</strong>
                     <span>{security.market}</span>
                     <em>{security.security_name}</em>
-                    <small>{security.bar_count.toLocaleString("en-US")} bars</small>
+                    <small>
+                      {security.latest_close_price
+                        ? `${formatNumber(security.latest_close_price, 2)} | `
+                        : ""}
+                      {security.bar_count.toLocaleString("en-US")} bars
+                    </small>
                   </button>
                 ))
               ) : (

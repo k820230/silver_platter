@@ -206,6 +206,7 @@ button:disabled {
 .volume-row span,
 .volume-row em,
 .recent-security-button span,
+.recent-security-button em,
 .volume-list p,
 .recent-security-list p {
   color: #6a747c;
@@ -217,6 +218,10 @@ button:disabled {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.recent-security-button em {
+  font-style: normal;
 }
 
 .recent-security-list {
