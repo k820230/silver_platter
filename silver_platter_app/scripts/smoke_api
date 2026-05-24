@@ -24,7 +24,15 @@ curl -fsS -X POST "${API_URL}/api/orders/submit" \
 
 curl -fsS -X POST "${API_URL}/api/ml/jobs/run" \
   -H 'Content-Type: application/json' \
-  -d '{"job_id":"smoke-ml","snapshot":{"security_id":"AAPL","as_of":"2026-05-22T09:00:00","last_price":200,"avg_volume_20d":50000000,"annualized_volatility":0.3,"risk_score":35},"horizons":["1d"]}' >/dev/null
+  -d '{"job_id":"smoke-ml","snapshot":{"security_id":"AAPL","as_of":"2026-05-22T09:00:00","last_price":200,"avg_volume_20d":50000000,"annualized_volatility":0.3,"risk_score":35},"horizons":["1d"],"observed_at":"2026-05-23T17:00:00","actual_bars":[{"security_id":"AAPL","bar_ts":"2026-05-23T15:00:00","close_price":203,"volume":1000000,"turnover_krw":10000000000,"available_to_model_at":"2026-05-23T16:00:00"}]}' | python3 -c '
+import json
+import sys
+
+payload = json.load(sys.stdin)
+prediction = payload["predictions"][0]
+if prediction["actual_price"] != 203.0 or prediction["absolute_error"] is None:
+    raise SystemExit("unexpected ML actual matching response: %s" % payload)
+' >/dev/null
 
 curl -fsS -X POST "${API_URL}/api/indices/chart" \
   -H 'Content-Type: application/json' \

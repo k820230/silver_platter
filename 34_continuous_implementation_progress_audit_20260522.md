@@ -94,6 +94,7 @@
 - OFAC Recent Actions headline metadata normalization
 - ML ops
 - due prediction actual matching
+- ML job API actual matching
 - charting
 - backtest
 - paper replay evidence
@@ -143,7 +144,7 @@
 - G7 live safety gate evidence
 - migration coverage
 
-현재 테스트 수: 189개
+현재 테스트 수: 190개
 
 ## 7. 검증 증적
 

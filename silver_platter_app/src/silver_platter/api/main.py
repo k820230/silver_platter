@@ -28,6 +28,7 @@ from silver_platter.ml import FeatureSnapshot, ModelRegistry, predict_many
 from silver_platter.ml_ops import (
     WatchlistRegistry,
     create_prediction_job,
+    match_due_prediction_actuals,
     run_prediction_job,
 )
 from silver_platter.broker import KoreaInvestmentBrokerAdapter, PaperBrokerAdapter
@@ -113,10 +114,21 @@ class WatchlistAddRequest(BaseModel):
     note: str = ""
 
 
+class ActualPriceBarRequest(BaseModel):
+    security_id: str
+    bar_ts: datetime
+    close_price: Optional[float]
+    volume: Optional[float]
+    turnover_krw: Optional[float]
+    available_to_model_at: Optional[datetime]
+
+
 class MlPredictionJobRequest(BaseModel):
     job_id: str
     snapshot: FeatureSnapshotRequest
     horizons: List[str] = Field(default_factory=lambda: ["1d", "1w", "1m", "3m"])
+    actual_bars: List[ActualPriceBarRequest] = Field(default_factory=list)
+    observed_at: Optional[datetime] = None
 
 
 class VolatilityObservationRequest(BaseModel):
@@ -441,6 +453,30 @@ def ml_job_run(request: MlPredictionJobRequest) -> Dict[str, Any]:
         request.snapshot.as_of,
     )
     predictions = run_prediction_job(job, snapshot)
+    if request.actual_bars:
+        observed_at = request.observed_at or max(
+            (
+                item.available_to_model_at
+                for item in request.actual_bars
+                if item.available_to_model_at is not None
+            ),
+            default=datetime.utcnow(),
+        )
+        predictions = match_due_prediction_actuals(
+            predictions,
+            [
+                PriceBarInput(
+                    security_id=item.security_id,
+                    bar_ts=item.bar_ts,
+                    close_price=item.close_price,
+                    volume=item.volume,
+                    turnover_krw=item.turnover_krw,
+                    available_to_model_at=item.available_to_model_at,
+                )
+                for item in request.actual_bars
+            ],
+            observed_at,
+        )
     return {
         "job": job.__dict__,
         "predictions": [

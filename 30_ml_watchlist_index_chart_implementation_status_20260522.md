@@ -64,6 +64,7 @@
 - `DELETE /api/watchlist/items/{user_id}/{security_id}`
 - `GET /api/watchlist/items/{user_id}`
 - `POST /api/ml/jobs/run`
+  - optional actual bar matching
 - `POST /api/indices/chart`
 
 ## 4. 테스트
@@ -81,6 +82,7 @@
 - actual price 연결
 - due prediction actual 자동 매칭
 - not-due/unavailable price bar 자동 매칭 제외
+- ML job API actual bar matching
 - error summary
 - 지수 chart filtering/sorting
 

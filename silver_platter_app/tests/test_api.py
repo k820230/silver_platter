@@ -7,14 +7,18 @@ from unittest.mock import patch
 from fastapi import HTTPException
 
 from silver_platter.api.main import (
+    ActualPriceBarRequest,
     BacktestRunRequest,
     ExportedSnapshotReplayRequest,
+    FeatureSnapshotRequest,
+    MlPredictionJobRequest,
     PriceBarQualityItem,
     backtest_replay_exported_snapshot,
     backtest_run,
     backtest_strategy_plugins,
     headline_risk_signals,
     HeadlineRiskSignalsRequest,
+    ml_job_run,
     operations_backup_status,
     operations_provider_health,
     provider_catalog,
@@ -216,6 +220,36 @@ class ApiBoundaryTests(TestCase):
 
         self.assertEqual(400, raised.exception.status_code)
         self.assertIn("max_backup_age_days", raised.exception.detail)
+
+    def test_ml_job_run_matches_actual_bars_when_observed(self):
+        payload = ml_job_run(
+            MlPredictionJobRequest(
+                job_id="api-ml-actual",
+                snapshot=FeatureSnapshotRequest(
+                    security_id="AAPL",
+                    as_of=datetime(2026, 5, 22, 9, 0, 0),
+                    last_price=200.0,
+                    avg_volume_20d=50_000_000,
+                    annualized_volatility=0.30,
+                    risk_score=35.0,
+                ),
+                horizons=["1d"],
+                actual_bars=[
+                    ActualPriceBarRequest(
+                        security_id="AAPL",
+                        bar_ts=datetime(2026, 5, 23, 15, 0, 0),
+                        close_price=203.0,
+                        volume=1_000_000,
+                        turnover_krw=10_000_000_000,
+                        available_to_model_at=datetime(2026, 5, 23, 16, 0, 0),
+                    )
+                ],
+                observed_at=datetime(2026, 5, 23, 17, 0, 0),
+            )
+        )
+
+        self.assertEqual(203.0, payload["predictions"][0]["actual_price"])
+        self.assertIsNotNone(payload["predictions"][0]["absolute_error"])
 
     def test_headline_risk_signals_endpoint_deduplicates_and_maps_signal(self):
         payload = headline_risk_signals(
