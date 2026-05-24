@@ -21,6 +21,7 @@ from silver_platter.api.main import (
     HeadlineRiskSignalsRequest,
     audit_setting_change_append,
     ml_job_run,
+    market_volume_leaders,
     operations_backup_status,
     operations_provider_health,
     provider_catalog,
@@ -329,6 +330,29 @@ class ApiBoundaryTests(TestCase):
         self.assertEqual("005930", payload["security"]["security_id"])
         self.assertEqual("stored", payload["history_prefetch"]["status"])
         prefetch.assert_called_once()
+
+    def test_market_volume_leaders_returns_two_market_lists(self):
+        api_main.VOLUME_LEADERS_CACHE.clear()
+        payload = {
+            "generated_at": "2026-05-24T00:00:00",
+            "limit": 20,
+            "markets": [
+                {"market": "KR", "status": "ready", "source": "test", "detail": "", "items": []},
+                {"market": "US", "status": "ready", "source": "test", "detail": "", "items": []},
+            ],
+        }
+        with patch.object(api_main, "_load_volume_leaders", return_value=payload) as loader:
+            result = market_volume_leaders()
+
+        loader.assert_called_once_with(20)
+        self.assertEqual(["KR", "US"], [item["market"] for item in result["markets"]])
+
+    def test_market_volume_leaders_rejects_invalid_limit(self):
+        with self.assertRaises(HTTPException) as raised:
+            market_volume_leaders(limit=0)
+
+        self.assertEqual(400, raised.exception.status_code)
+        self.assertIn("limit", raised.exception.detail)
 
     def test_ml_job_run_matches_actual_bars_when_observed(self):
         payload = ml_job_run(

@@ -8,6 +8,7 @@ requested_symbol="${HISTORY_PREFETCH_SMOKE_SYMBOL:-}"
 requested_market="${HISTORY_PREFETCH_SMOKE_MARKET:-}"
 requested_start_date="${HISTORY_PREFETCH_SMOKE_START_DATE:-}"
 requested_end_date="${HISTORY_PREFETCH_SMOKE_END_DATE:-}"
+requested_target_bar_count="${HISTORY_PREFETCH_TARGET_BAR_COUNT:-}"
 . scripts/load_local_env
 
 HISTORY_PREFETCH_SMOKE_ENABLED="${requested_enabled:-${HISTORY_PREFETCH_SMOKE_ENABLED:-0}}"
@@ -15,6 +16,7 @@ HISTORY_PREFETCH_SMOKE_SYMBOL="${requested_symbol:-${HISTORY_PREFETCH_SMOKE_SYMB
 HISTORY_PREFETCH_SMOKE_MARKET="${requested_market:-${HISTORY_PREFETCH_SMOKE_MARKET:-KR}}"
 HISTORY_PREFETCH_SMOKE_START_DATE="${requested_start_date:-${HISTORY_PREFETCH_SMOKE_START_DATE:-}}"
 HISTORY_PREFETCH_SMOKE_END_DATE="${requested_end_date:-${HISTORY_PREFETCH_SMOKE_END_DATE:-}}"
+HISTORY_PREFETCH_TARGET_BAR_COUNT="${requested_target_bar_count:-${HISTORY_PREFETCH_TARGET_BAR_COUNT:-300}}"
 
 if [ "${HISTORY_PREFETCH_SMOKE_ENABLED:-0}" != "1" ]; then
   echo "History prefetch smoke skipped: set HISTORY_PREFETCH_SMOKE_ENABLED=1 to run DB-backed KIS history prefetch"
@@ -29,13 +31,17 @@ from silver_platter.api.main import _prefetch_history_for_security
 
 symbol = os.getenv("HISTORY_PREFETCH_SMOKE_SYMBOL", "005930")
 market = os.getenv("HISTORY_PREFETCH_SMOKE_MARKET", "KR")
+target_bar_count = int(os.getenv("HISTORY_PREFETCH_TARGET_BAR_COUNT", "300"))
+lookback_days = int(
+    os.getenv("HISTORY_PREFETCH_LOOKBACK_DAYS", str(max(450, target_bar_count * 2)))
+)
 end_date = date.fromisoformat(
     os.getenv("HISTORY_PREFETCH_SMOKE_END_DATE", date.today().isoformat())
 )
 start_date = date.fromisoformat(
     os.getenv(
         "HISTORY_PREFETCH_SMOKE_START_DATE",
-        (end_date - timedelta(days=30)).isoformat(),
+        (end_date - timedelta(days=lookback_days)).isoformat(),
     )
 )
 

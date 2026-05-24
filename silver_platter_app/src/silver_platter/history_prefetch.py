@@ -85,7 +85,10 @@ class HistoricalPricePrefetcher:
         market_code: str = "",
         start_date: Optional[date] = None,
         end_date: Optional[date] = None,
+        target_bar_count: int = 1,
     ) -> HistoryPrefetchResult:
+        if target_bar_count <= 0:
+            raise ValueError("target_bar_count must be positive")
         security = infer_security_reference(symbol, market_code)
         provider_id = self.repository.ensure_provider_id(provider.metadata)
         existing_security_id = self.repository.get_security_id(
@@ -100,7 +103,7 @@ class HistoricalPricePrefetcher:
             self.bar_interval,
         )
         storage_uri = _storage_uri(security, provider.metadata.provider_code)
-        if existing_bar_count > 0:
+        if existing_bar_count >= target_bar_count:
             self.repository.commit()
             return HistoryPrefetchResult(
                 security_id=security.symbol,
@@ -112,7 +115,8 @@ class HistoricalPricePrefetcher:
                 existing_bar_count=existing_bar_count,
                 quality_status="ok",
                 storage_uri=storage_uri,
-                detail="price history already exists in DB",
+                detail="price history already has at least %s bars in DB"
+                % target_bar_count,
             )
 
         ingestion = collect_price_bars(

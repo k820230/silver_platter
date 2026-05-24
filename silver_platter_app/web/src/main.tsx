@@ -253,6 +253,33 @@ type StrategyPluginsResponse = {
   plugins: StrategyPlugin[];
 };
 
+type VolumeLeader = {
+  rank: number;
+  market: string;
+  symbol: string;
+  name: string;
+  exchange_code: string;
+  last_price: number | null;
+  change_pct: number | null;
+  volume: number;
+  turnover: number | null;
+  source: string;
+};
+
+type VolumeLeaderMarket = {
+  market: string;
+  status: string;
+  source: string;
+  detail: string;
+  items: VolumeLeader[];
+};
+
+type VolumeLeadersResponse = {
+  generated_at: string;
+  limit: number;
+  markets: VolumeLeaderMarket[];
+};
+
 type DashboardData = {
   health: HealthResponse | null;
   mlJob: MlJobResponse | null;
@@ -268,7 +295,13 @@ type DashboardData = {
   tax: OverseasTaxResponse | null;
   backtest: BacktestResponse | null;
   headlineRisk: HeadlineRiskResponse | null;
+  volumeLeaders: VolumeLeadersResponse | null;
   strategyPlugins: StrategyPlugin[];
+};
+
+type RecentPreviewSecurity = {
+  securityId: string;
+  market: string;
 };
 
 type OrderForm = {
@@ -294,6 +327,8 @@ const DEFAULT_ORDER: OrderForm = {
 };
 
 const DASHBOARD_POLL_INTERVAL_MS = 60_000;
+const RECENT_PREVIEW_SECURITIES_KEY = "silver-platter:recent-preview-securities";
+const RECENT_PREVIEW_SECURITIES_LIMIT = 20;
 
 const EMPTY_DASHBOARD: DashboardData = {
   health: null,
@@ -310,6 +345,7 @@ const EMPTY_DASHBOARD: DashboardData = {
   tax: null,
   backtest: null,
   headlineRisk: null,
+  volumeLeaders: null,
   strategyPlugins: [],
 };
 
@@ -347,6 +383,13 @@ function formatNumber(value: number, digits = 1): string {
     maximumFractionDigits: digits,
     minimumFractionDigits: digits,
   });
+}
+
+function formatCompactNumber(value: number): string {
+  return new Intl.NumberFormat("en-US", {
+    maximumFractionDigits: 1,
+    notation: "compact",
+  }).format(value);
 }
 
 function formatPct(value: number): string {
@@ -447,6 +490,48 @@ function historyPrefetchLabel(result: HistoryPrefetchResult | null, state: Reque
     return `History ready ${result.existing_bar_count.toLocaleString("en-US")} bars`;
   }
   return `History ${statusLabel(result.status)}`;
+}
+
+function loadRecentPreviewSecurities(): RecentPreviewSecurity[] {
+  try {
+    const payload = window.localStorage.getItem(RECENT_PREVIEW_SECURITIES_KEY);
+    if (!payload) {
+      return [];
+    }
+    const parsed = JSON.parse(payload) as RecentPreviewSecurity[];
+    if (!Array.isArray(parsed)) {
+      return [];
+    }
+    return parsed
+      .filter((item) => item && item.securityId && item.market)
+      .slice(0, RECENT_PREVIEW_SECURITIES_LIMIT);
+  } catch {
+    return [];
+  }
+}
+
+function saveRecentPreviewSecurities(items: RecentPreviewSecurity[]): void {
+  try {
+    window.localStorage.setItem(
+      RECENT_PREVIEW_SECURITIES_KEY,
+      JSON.stringify(items.slice(0, RECENT_PREVIEW_SECURITIES_LIMIT)),
+    );
+  } catch {
+    return;
+  }
+}
+
+function nextRecentPreviewSecurities(
+  current: RecentPreviewSecurity[],
+  form: OrderForm,
+): RecentPreviewSecurity[] {
+  const securityId = (form.securityId.trim() || DEFAULT_ORDER.securityId).toUpperCase();
+  const market = (form.market || DEFAULT_ORDER.market).toUpperCase();
+  const deduped = current.filter(
+    (item) =>
+      item.securityId.toUpperCase() !== securityId || item.market.toUpperCase() !== market,
+  );
+  return [{ securityId, market }, ...deduped].slice(0, RECENT_PREVIEW_SECURITIES_LIMIT);
 }
 
 function orderPayload(form: OrderForm) {
@@ -594,6 +679,9 @@ async function loadDashboardData(form: OrderForm): Promise<DashboardData> {
     "/api/operations/provider-health",
   );
   const providerCatalogPromise = apiGet<ProviderCatalogResponse>("/api/providers/catalog");
+  const volumeLeadersPromise = apiGet<VolumeLeadersResponse>(
+    "/api/markets/volume-leaders?limit=20",
+  );
   const backupStatusPromise = apiGet<BackupStatusResponse>("/api/operations/backup-status");
   const strategyPluginsPromise = apiGet<StrategyPluginsResponse>("/api/backtests/strategy-plugins");
   const auditPromise = apiGet<AuditEventsResponse>("/api/audit/events");
@@ -681,6 +769,7 @@ async function loadDashboardData(form: OrderForm): Promise<DashboardData> {
     operations,
     providerHealth,
     providerCatalog,
+    volumeLeaders,
     backupStatus,
     strategyPlugins,
     audit,
@@ -697,6 +786,7 @@ async function loadDashboardData(form: OrderForm): Promise<DashboardData> {
     operationsPromise,
     providerHealthPromise,
     providerCatalogPromise,
+    volumeLeadersPromise,
     backupStatusPromise,
     strategyPluginsPromise,
     auditPromise,
@@ -715,6 +805,7 @@ async function loadDashboardData(form: OrderForm): Promise<DashboardData> {
     operations,
     providerHealth,
     providerCatalog,
+    volumeLeaders,
     backupStatus,
     strategyPlugins: strategyPlugins.plugins,
     audit,
@@ -731,6 +822,9 @@ function App() {
   const [preview, setPreview] = useState<OrderPreviewResponse | null>(null);
   const [submission, setSubmission] = useState<OrderSubmitResponse | null>(null);
   const [historyPrefetch, setHistoryPrefetch] = useState<HistoryPrefetchResult | null>(null);
+  const [recentPreviewSecurities, setRecentPreviewSecurities] = useState<
+    RecentPreviewSecurity[]
+  >(() => loadRecentPreviewSecurities());
   const [state, setState] = useState<RequestState>("idle");
   const [actionState, setActionState] = useState<RequestState>("idle");
   const [historyState, setHistoryState] = useState<RequestState>("idle");
@@ -746,6 +840,11 @@ function App() {
       ]);
       setData(dashboard);
       setPreview(nextPreview);
+      setRecentPreviewSecurities((current) => {
+        const next = nextRecentPreviewSecurities(current, nextForm);
+        saveRecentPreviewSecurities(next);
+        return next;
+      });
       setState("ready");
     } catch (exc) {
       setState("error");
@@ -813,11 +912,26 @@ function App() {
         prefetch_history: true,
       });
       setHistoryPrefetch(result.history_prefetch);
+      setRecentPreviewSecurities((current) => {
+        const next = nextRecentPreviewSecurities(current, form);
+        saveRecentPreviewSecurities(next);
+        return next;
+      });
       setHistoryState("ready");
     } catch (exc) {
       setHistoryState("error");
       setError(exc instanceof Error ? exc.message : "history prefetch failed");
     }
+  };
+
+  const applySecurityToPreview = (securityId: string, market: string) => {
+    setHistoryPrefetch(null);
+    setHistoryState("idle");
+    setForm((current) => ({
+      ...current,
+      securityId,
+      market,
+    }));
   };
 
   const priceRanges = preview?.price_ranges ?? [];
@@ -873,6 +987,7 @@ function App() {
         ? data.providerHealth.status
         : data.operations?.status;
   const gateStatus = data.gate?.status;
+  const volumeMarkets = data.volumeLeaders?.markets ?? [];
 
   return (
     <main className="app-shell">
@@ -898,6 +1013,80 @@ function App() {
           <span>{error}</span>
         </section>
       ) : null}
+
+      <section className="top-insights" aria-label="Market shortcuts">
+        <article className="volume-leader-panel">
+          <header>
+            <div>
+              <h2>Volume Top 20</h2>
+              <span>
+                {data.volumeLeaders
+                  ? new Date(data.volumeLeaders.generated_at).toLocaleTimeString("ko-KR", {
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })
+                  : "Loading"}
+              </span>
+            </div>
+            <BarChart3 size={18} />
+          </header>
+          <div className="volume-market-grid">
+            {volumeMarkets.map((market) => (
+              <section className="volume-market" key={market.market}>
+                <header>
+                  <strong>{market.market}</strong>
+                  <span>{statusLabel(market.status)}</span>
+                </header>
+                <div className="volume-list">
+                  {market.items.length ? (
+                    market.items.slice(0, 20).map((item) => (
+                      <button
+                        type="button"
+                        className="volume-row"
+                        key={`${market.market}-${item.symbol}-${item.exchange_code}`}
+                        onClick={() => applySecurityToPreview(item.symbol, market.market)}
+                        title={`Set ${item.symbol} in Order Preview`}
+                      >
+                        <span>{item.rank}</span>
+                        <strong>{item.symbol}</strong>
+                        <em>{item.name || item.exchange_code}</em>
+                        <span>{formatCompactNumber(item.volume)}</span>
+                      </button>
+                    ))
+                  ) : (
+                    <p>{market.detail || statusLabel(market.status)}</p>
+                  )}
+                </div>
+              </section>
+            ))}
+          </div>
+        </article>
+
+        <article className="recent-security-panel">
+          <header>
+            <h2>Recent Preview</h2>
+            <span>{recentPreviewSecurities.length}/20</span>
+          </header>
+          <div className="recent-security-list">
+            {recentPreviewSecurities.length ? (
+              recentPreviewSecurities.map((item) => (
+                <button
+                  type="button"
+                  key={`${item.market}-${item.securityId}`}
+                  className="recent-security-button"
+                  onClick={() => applySecurityToPreview(item.securityId, item.market)}
+                  title={`Set ${item.securityId} in Order Preview`}
+                >
+                  <strong>{item.securityId}</strong>
+                  <span>{item.market}</span>
+                </button>
+              ))
+            ) : (
+              <p>No previews yet</p>
+            )}
+          </div>
+        </article>
+      </section>
 
       <section className="metric-grid" aria-label="Status metrics">
         <article className={`metric-card ${statusTone(riskStatus)}`}>

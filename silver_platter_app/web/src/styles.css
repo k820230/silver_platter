@@ -115,6 +115,120 @@ button:disabled {
   font-size: 18px;
 }
 
+.top-insights {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: minmax(360px, 1.6fr) minmax(260px, 0.8fr);
+  margin-top: 16px;
+}
+
+.volume-leader-panel,
+.recent-security-panel {
+  background: #ffffff;
+  border: 1px solid #dce3e8;
+  border-radius: 8px;
+  padding: 14px;
+}
+
+.volume-leader-panel > header,
+.recent-security-panel > header {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.volume-leader-panel h2,
+.recent-security-panel h2 {
+  font-size: 15px;
+  margin: 0;
+}
+
+.volume-leader-panel header span,
+.recent-security-panel header span {
+  color: #6a747c;
+  font-size: 12px;
+}
+
+.volume-market-grid {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.volume-market {
+  min-width: 0;
+}
+
+.volume-market header {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+
+.volume-list,
+.recent-security-list {
+  display: grid;
+  gap: 6px;
+}
+
+.volume-list {
+  max-height: 326px;
+  overflow: auto;
+}
+
+.volume-row,
+.recent-security-button {
+  align-items: center;
+  background: #f7f9fa;
+  border: 1px solid #e0e7eb;
+  border-radius: 6px;
+  color: #182026;
+  display: grid;
+  font: inherit;
+  min-width: 0;
+  padding: 8px;
+  text-align: left;
+}
+
+.volume-row {
+  gap: 8px;
+  grid-template-columns: 24px 70px minmax(0, 1fr) 64px;
+}
+
+.volume-row:hover,
+.recent-security-button:hover {
+  background: #eef4f8;
+  border-color: #cbd9e1;
+}
+
+.volume-row span,
+.volume-row em,
+.recent-security-button span,
+.volume-list p,
+.recent-security-list p {
+  color: #6a747c;
+  font-size: 12px;
+}
+
+.volume-row em {
+  font-style: normal;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.recent-security-list {
+  grid-template-columns: repeat(auto-fit, minmax(118px, 1fr));
+  max-height: 326px;
+  overflow: auto;
+}
+
+.recent-security-button {
+  gap: 3px;
+}
+
 .metric-card.ok svg,
 .ok {
   color: #39705f;
@@ -427,6 +541,15 @@ select {
 
   .workbench {
     grid-template-columns: 1fr;
+  }
+
+  .top-insights,
+  .volume-market-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .volume-row {
+    grid-template-columns: 22px 66px minmax(0, 1fr) 58px;
   }
 
   .ticket-grid {

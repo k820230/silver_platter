@@ -371,6 +371,69 @@ class ProviderTests(TestCase):
         self.assertEqual([], transport.posts)
         self.assertEqual("Bearer cached-token", transport.gets[0][1]["authorization"])
 
+    def test_kis_daily_price_provider_paginates_to_target_bar_count(self):
+        class FakeTransport:
+            def __init__(self):
+                self.posts = []
+                self.gets = []
+
+            def post(self, path, headers, body):
+                self.posts.append((path, headers, body))
+                return {"access_token": "token-1"}
+
+            def get(self, path, headers, params):
+                self.gets.append((path, headers, params))
+                date_to = params["FID_INPUT_DATE_2"]
+                if date_to == "20260522":
+                    return {
+                        "output2": [
+                            {
+                                "stck_bsop_date": "20260522",
+                                "stck_clpr": "70500",
+                                "acml_vol": "100",
+                                "acml_tr_pbmn": "7050000",
+                            },
+                            {
+                                "stck_bsop_date": "20260521",
+                                "stck_clpr": "70000",
+                                "acml_vol": "90",
+                                "acml_tr_pbmn": "6300000",
+                            },
+                        ]
+                    }
+                return {
+                    "output2": [
+                        {
+                            "stck_bsop_date": "20260520",
+                            "stck_clpr": "69000",
+                            "acml_vol": "80",
+                            "acml_tr_pbmn": "5520000",
+                        }
+                    ]
+                }
+
+        transport = FakeTransport()
+        provider = KoreaInvestmentDailyPriceProvider(
+            KoreaInvestmentCredentials("app", "secret", "12345678"),
+            transport,
+            start_date=date(2026, 1, 1),
+            end_date=date(2026, 5, 22),
+            max_bar_count=3,
+        )
+
+        with patch.dict("os.environ", {"KIS_REQUEST_SLEEP_SECONDS": "0"}):
+            bars = list(provider.get_price_bars("005930"))
+
+        self.assertEqual(
+            [
+                datetime(2026, 5, 20, 16, 0, 0),
+                datetime(2026, 5, 21, 16, 0, 0),
+                datetime(2026, 5, 22, 16, 0, 0),
+            ],
+            [bar.bar_ts for bar in bars],
+        )
+        self.assertEqual(2, len(transport.gets))
+
     def test_opendart_provider_normalizes_disclosure_metadata(self):
         calls = []
 

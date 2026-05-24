@@ -98,3 +98,22 @@ class HistoryPrefetchTests(TestCase):
         self.assertEqual([], repository.ingestions)
         self.assertEqual(1, repository.commits)
 
+    def test_prefetch_backfills_when_existing_history_is_below_target(self):
+        repository = FakeHistoryRepository(
+            existing_security_id=11,
+            existing_bar_count=12,
+        )
+        provider = StaticMarketDataProvider(
+            "stock_info_api",
+            [sample_bar("005930", datetime(2026, 5, 22, 16, 0, 0), 70000.0)],
+        )
+
+        result = HistoricalPricePrefetcher(repository).prefetch(
+            "005930",
+            provider,
+            target_bar_count=300,
+        )
+
+        self.assertEqual("stored", result.status)
+        self.assertEqual(12, result.existing_bar_count)
+        self.assertEqual(1, len(repository.ingestions))

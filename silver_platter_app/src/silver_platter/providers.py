@@ -4,6 +4,8 @@ import gzip
 import io
 from html.parser import HTMLParser
 import json
+import os
+import time as time_module
 import urllib.parse
 import urllib.request
 import zlib
@@ -578,11 +580,14 @@ class KoreaInvestmentDailyPriceProvider(MarketDataProvider):
         transport: object,
         start_date: date,
         end_date: date,
+        max_bar_count: Optional[int] = None,
         access_token: Optional[str] = None,
         token_cache_path: Optional[str] = None,
     ):
         if start_date > end_date:
             raise ValueError("start_date must be on or before end_date")
+        if max_bar_count is not None and max_bar_count <= 0:
+            raise ValueError("max_bar_count must be positive")
         self._metadata = ProviderMetadata(
             provider_code="kis_domestic_daily_price",
             provider_type="market_data",
@@ -595,6 +600,7 @@ class KoreaInvestmentDailyPriceProvider(MarketDataProvider):
         self._transport = transport
         self._start_date = start_date
         self._end_date = end_date
+        self._max_bar_count = max_bar_count
         self._access_token = access_token
         self._token_cache_path = (
             Path(token_cache_path).expanduser() if token_cache_path else None
@@ -606,26 +612,80 @@ class KoreaInvestmentDailyPriceProvider(MarketDataProvider):
 
     def get_price_bars(self, symbol: str) -> Iterable[PriceBarInput]:
         provider_symbol = _normalize_kis_domestic_symbol(symbol)
+        rows = self._fetch_rows(provider_symbol)
+        bars = [
+            self._normalize_row(provider_symbol, row)
+            for row in rows
+            if isinstance(row, dict)
+        ]
+        bars = sorted(
+            {bar.bar_ts: bar for bar in bars}.values(),
+            key=lambda item: item.bar_ts,
+            reverse=True,
+        )
+        if self._max_bar_count is not None:
+            bars = bars[: self._max_bar_count]
+        return sorted(bars, key=lambda item: item.bar_ts)
+
+    def _fetch_rows(self, provider_symbol: str) -> List[Dict[str, object]]:
+        if self._max_bar_count is None:
+            return self._fetch_rows_for_range(
+                provider_symbol,
+                self._start_date,
+                self._end_date,
+            )
+
+        rows: List[Dict[str, object]] = []
+        cursor_end = self._end_date
+        request_count = 0
+        while cursor_end >= self._start_date and len(rows) < self._max_bar_count:
+            if request_count:
+                time_module.sleep(_kis_request_pause_seconds())
+            chunk_start = max(self._start_date, cursor_end - timedelta(days=160))
+            chunk_rows = self._fetch_rows_for_range(
+                provider_symbol,
+                chunk_start,
+                cursor_end,
+            )
+            request_count += 1
+            rows.extend(chunk_rows)
+            if not chunk_rows:
+                cursor_end = chunk_start - timedelta(days=1)
+                continue
+            dates = [
+                date.fromisoformat("%s-%s-%s" % (raw[0:4], raw[4:6], raw[6:8]))
+                for raw in (
+                    _dict_value(row, ("stck_bsop_date", "STCK_BSOP_DATE"))
+                    for row in chunk_rows
+                    if isinstance(row, dict)
+                )
+                if len(raw) == 8
+            ]
+            cursor_end = (min(dates) if dates else chunk_start) - timedelta(days=1)
+        return rows
+
+    def _fetch_rows_for_range(
+        self,
+        provider_symbol: str,
+        start_date: date,
+        end_date: date,
+    ) -> List[Dict[str, object]]:
         response = self._transport.get(
             "/uapi/domestic-stock/v1/quotations/inquire-daily-itemchartprice",
             self._auth_headers("FHKST03010100"),
             {
                 "FID_COND_MRKT_DIV_CODE": "J",
                 "FID_INPUT_ISCD": provider_symbol,
-                "FID_INPUT_DATE_1": self._start_date.strftime("%Y%m%d"),
-                "FID_INPUT_DATE_2": self._end_date.strftime("%Y%m%d"),
+                "FID_INPUT_DATE_1": start_date.strftime("%Y%m%d"),
+                "FID_INPUT_DATE_2": end_date.strftime("%Y%m%d"),
                 "FID_PERIOD_DIV_CODE": "D",
                 "FID_ORG_ADJ_PRC": "0",
             },
         )
         rows = response.get("output2", [])
         if not isinstance(rows, list):
-            rows = []
-        return [
-            self._normalize_row(provider_symbol, row)
-            for row in rows
-            if isinstance(row, dict)
-        ]
+            return []
+        return [row for row in rows if isinstance(row, dict)]
 
     def _auth_headers(self, tr_id: str) -> Dict[str, str]:
         token = self._get_access_token()
@@ -728,6 +788,14 @@ def _normalize_kis_domestic_symbol(symbol: str) -> str:
     if not normalized:
         raise ValueError("symbol is required")
     return normalized
+
+
+def _kis_request_pause_seconds() -> float:
+    raw_value = os.getenv("KIS_REQUEST_SLEEP_SECONDS", "1.1").strip()
+    try:
+        return max(0.0, float(raw_value))
+    except ValueError:
+        return 1.1
 
 
 def _dict_value(row: Dict[str, object], names: Sequence[str]) -> str:

@@ -15,6 +15,7 @@ from silver_platter.history_prefetch import (
     HistoricalPricePrefetcher,
     infer_security_reference,
 )
+from silver_platter.market_rankings import KoreaInvestmentVolumeRankingProvider
 from silver_platter.migrations import connect_goldilocks_from_env
 from silver_platter.charting import IndexObservation, build_index_chart_series
 from silver_platter.data_quality import PriceBarInput, evaluate_price_bars
@@ -90,6 +91,7 @@ ORDER_IDEMPOTENCY = IdempotencyRegistry()
 WATCHLISTS = WatchlistRegistry()
 WATCHLIST_STORE_LOADED_FROM: Optional[str] = None
 AUDIT_LOG = AuditLog()
+VOLUME_LEADERS_CACHE: Dict[str, Tuple[datetime, Dict[str, Any]]] = {}
 
 
 class OrderPreviewRequest(BaseModel):
@@ -426,10 +428,16 @@ def _history_prefetch_skip(
 def _history_prefetch_date_range(
     start_date: Optional[date],
     end_date: Optional[date],
+    target_bar_count: int,
 ) -> Tuple[date, date]:
     end = end_date or date.today()
     if start_date is None:
-        lookback_days = int(os.getenv("HISTORY_PREFETCH_LOOKBACK_DAYS", "365"))
+        lookback_days = int(
+            os.getenv(
+                "HISTORY_PREFETCH_LOOKBACK_DAYS",
+                str(max(450, target_bar_count * 2)),
+            )
+        )
         start = end - timedelta(days=max(1, lookback_days))
     else:
         start = start_date
@@ -446,6 +454,7 @@ def _prefetch_history_for_security(
     enabled: bool = True,
 ) -> Dict[str, Any]:
     security = infer_security_reference(security_id, market)
+    target_bar_count = int(os.getenv("HISTORY_PREFETCH_TARGET_BAR_COUNT", "300"))
     if not enabled:
         return _history_prefetch_skip(
             security.symbol,
@@ -472,7 +481,11 @@ def _prefetch_history_for_security(
         )
 
     try:
-        start, end = _history_prefetch_date_range(start_date, end_date)
+        start, end = _history_prefetch_date_range(
+            start_date,
+            end_date,
+            target_bar_count,
+        )
         connection = connect_goldilocks_from_env()
         provider = KoreaInvestmentDailyPriceProvider(
             KoreaInvestmentCredentials(
@@ -485,6 +498,7 @@ def _prefetch_history_for_security(
             KoreaInvestmentHttpTransport(settings.kis.api_base_url),
             start_date=start,
             end_date=end,
+            max_bar_count=target_bar_count,
             access_token=os.getenv("KIS_ACCESS_TOKEN", "").strip() or None,
             token_cache_path=_kis_token_cache_path(settings),
         )
@@ -496,6 +510,7 @@ def _prefetch_history_for_security(
             market_code=security.market_code,
             start_date=start,
             end_date=end,
+            target_bar_count=target_bar_count,
         )
         return result.as_dict()
     except ValueError as exc:
@@ -523,9 +538,118 @@ def _kis_token_cache_path(settings: AppSettings) -> str:
     return str(Path(settings.raw_data_dir) / "kis_access_token.json")
 
 
+def _volume_leaders_cache_seconds() -> int:
+    return max(0, int(os.getenv("VOLUME_LEADERS_CACHE_SECONDS", "300")))
+
+
+def _volume_market_payload(
+    market: str,
+    status: str,
+    source: str,
+    items: List[Dict[str, Any]],
+    detail: str = "",
+) -> Dict[str, Any]:
+    return {
+        "market": market,
+        "status": status,
+        "source": source,
+        "detail": detail,
+        "items": items,
+    }
+
+
+def _load_volume_leaders(limit: int) -> Dict[str, Any]:
+    if limit <= 0 or limit > 50:
+        raise ValueError("limit must be between 1 and 50")
+    cache_key = "limit:%s" % limit
+    now = datetime.utcnow()
+    cached = VOLUME_LEADERS_CACHE.get(cache_key)
+    if cached is not None:
+        cached_at, payload = cached
+        if (now - cached_at).total_seconds() <= _volume_leaders_cache_seconds():
+            return payload
+
+    settings = AppSettings.from_env()
+    if not settings.kis.configured_for_queries():
+        payload = {
+            "generated_at": now.isoformat(),
+            "limit": limit,
+            "markets": [
+                _volume_market_payload(
+                    "KR",
+                    "skipped_provider_unconfigured",
+                    "kis_domestic_volume_rank",
+                    [],
+                    "KIS query credentials are not configured",
+                ),
+                _volume_market_payload(
+                    "US",
+                    "skipped_provider_unconfigured",
+                    "kis_overseas_trade_vol",
+                    [],
+                    "KIS query credentials are not configured",
+                ),
+            ],
+        }
+        VOLUME_LEADERS_CACHE[cache_key] = (now, payload)
+        return payload
+
+    provider = KoreaInvestmentVolumeRankingProvider(
+        KoreaInvestmentCredentials(
+            app_key=settings.kis.app_key,
+            app_secret=settings.kis.app_secret,
+            account_number=settings.kis.account_number,
+            account_product_code=settings.kis.account_product_code,
+            trading_env=settings.kis.trading_env,
+        ),
+        KoreaInvestmentHttpTransport(settings.kis.api_base_url),
+        access_token=os.getenv("KIS_ACCESS_TOKEN", "").strip() or None,
+        token_cache_path=_kis_token_cache_path(settings),
+    )
+    markets = []
+    try:
+        domestic = [item.as_dict() for item in provider.domestic_volume_leaders(limit)]
+        markets.append(
+            _volume_market_payload("KR", "ready", "kis_domestic_volume_rank", domestic)
+        )
+    except Exception as exc:
+        markets.append(
+            _volume_market_payload(
+                "KR",
+                "failed",
+                "kis_domestic_volume_rank",
+                [],
+                str(exc),
+            )
+        )
+    try:
+        us = [item.as_dict() for item in provider.us_volume_leaders(limit)]
+        markets.append(_volume_market_payload("US", "ready", "kis_overseas_trade_vol", us))
+    except Exception as exc:
+        markets.append(
+            _volume_market_payload("US", "failed", "kis_overseas_trade_vol", [], str(exc))
+        )
+
+    payload = {
+        "generated_at": now.isoformat(),
+        "limit": limit,
+        "markets": markets,
+    }
+    VOLUME_LEADERS_CACHE[cache_key] = (now, payload)
+    return payload
+
+
 @app.get("/health")
 def health() -> Dict[str, Any]:
     return get_health(AppSettings.from_env())
+
+
+@app.get("/api/markets/volume-leaders")
+def market_volume_leaders(limit: int = 20) -> Dict[str, Any]:
+    try:
+        return _load_volume_leaders(limit)
+    except ValueError as exc:
+        raise _bad_request(exc) from exc
 
 
 @app.post("/api/orders/preview")
