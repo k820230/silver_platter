@@ -37,6 +37,7 @@ cd /home/jhkim5/silver_platter/silver_platter_app
 ./scripts/check
 ./scripts/smoke_api
 ./scripts/scheduler_smoke
+./scripts/guarded_smoke
 ./scripts/migrate status
 ./scripts/migrate render
 ./scripts/migrate plan

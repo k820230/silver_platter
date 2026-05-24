@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+cd "$(dirname "$0")/.."
+
+./scripts/goldilocks_odbc_smoke
+./scripts/goldilocks_repository_smoke
+./scripts/kis_orderable_smoke
+./scripts/provider_smoke
+./scripts/alert_webhook_smoke
