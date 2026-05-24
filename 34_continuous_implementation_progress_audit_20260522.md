@@ -147,6 +147,7 @@
 - G7 live safety gate evidence
 - script result gate evidence conversion
 - backup status G8 evidence conversion
+- verification status UI card
 - migration coverage
 
 현재 테스트 수: 195개
