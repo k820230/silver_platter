@@ -252,6 +252,26 @@ class ScriptHelperTests(TestCase):
 
             self.assertIn("KRX price smoke skipped", result.stdout)
 
+    def test_history_prefetch_smoke_preserves_explicit_disabled_env(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self._copy_scripts(root, ["history_prefetch_smoke", "load_local_env"])
+            (root / ".env").write_text(
+                "HISTORY_PREFETCH_SMOKE_ENABLED=1\n",
+                encoding="utf-8",
+            )
+
+            result = subprocess.run(
+                ["bash", "scripts/history_prefetch_smoke"],
+                cwd=root,
+                env={**self._script_env(), "HISTORY_PREFETCH_SMOKE_ENABLED": "0"},
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertIn("History prefetch smoke skipped", result.stdout)
+
     def test_collect_g7_approval_evidence_writes_pass_bundle_without_approval(self):
         script = Path(__file__).resolve().parents[1] / "scripts" / "collect_g7_approval_evidence"
         with TemporaryDirectory() as tmp:

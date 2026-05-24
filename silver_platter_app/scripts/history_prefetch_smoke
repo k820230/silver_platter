@@ -2,7 +2,19 @@
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
+
+requested_enabled="${HISTORY_PREFETCH_SMOKE_ENABLED:-}"
+requested_symbol="${HISTORY_PREFETCH_SMOKE_SYMBOL:-}"
+requested_market="${HISTORY_PREFETCH_SMOKE_MARKET:-}"
+requested_start_date="${HISTORY_PREFETCH_SMOKE_START_DATE:-}"
+requested_end_date="${HISTORY_PREFETCH_SMOKE_END_DATE:-}"
 . scripts/load_local_env
+
+HISTORY_PREFETCH_SMOKE_ENABLED="${requested_enabled:-${HISTORY_PREFETCH_SMOKE_ENABLED:-0}}"
+HISTORY_PREFETCH_SMOKE_SYMBOL="${requested_symbol:-${HISTORY_PREFETCH_SMOKE_SYMBOL:-005930}}"
+HISTORY_PREFETCH_SMOKE_MARKET="${requested_market:-${HISTORY_PREFETCH_SMOKE_MARKET:-KR}}"
+HISTORY_PREFETCH_SMOKE_START_DATE="${requested_start_date:-${HISTORY_PREFETCH_SMOKE_START_DATE:-}}"
+HISTORY_PREFETCH_SMOKE_END_DATE="${requested_end_date:-${HISTORY_PREFETCH_SMOKE_END_DATE:-}}"
 
 if [ "${HISTORY_PREFETCH_SMOKE_ENABLED:-0}" != "1" ]; then
   echo "History prefetch smoke skipped: set HISTORY_PREFETCH_SMOKE_ENABLED=1 to run DB-backed KIS history prefetch"
