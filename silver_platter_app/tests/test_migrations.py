@@ -5,9 +5,12 @@ from tempfile import TemporaryDirectory
 from silver_platter.migrations import (
     apply_migrations,
     build_migration_plan,
+    goldilocks_compatible_statement,
+    is_idempotent_create_statement,
     load_applied_migrations,
     list_migrations,
     render_migrations,
+    sql_literal,
     split_sql_statements,
 )
 from silver_platter.providers import default_mvp_provider_catalog
@@ -26,8 +29,12 @@ class FakeCursor:
             return self
 
         if sql.startswith("INSERT INTO SP.schema_migration_note"):
-            name, checksum = params
             self.connection.note_table_exists = True
+            values = sql.split("VALUES", 1)[1]
+            name, checksum = [
+                item.strip().strip("'")
+                for item in values.strip().lstrip("(").rstrip(")").split(",")
+            ]
             self.connection.applied[name] = checksum
             return self
 
@@ -120,6 +127,45 @@ class MigrationTest(unittest.TestCase):
 
         self.assertEqual(3, len(statements))
         self.assertIn("'semi;colon'", statements[1])
+
+    def test_goldilocks_compatible_statement_removes_unsupported_if_not_exists(self):
+        self.assertEqual(
+            "CREATE SCHEMA SP",
+            goldilocks_compatible_statement("CREATE SCHEMA IF NOT EXISTS SP"),
+        )
+        self.assertEqual(
+            "CREATE TABLE SP.t (id BIGINT)",
+            goldilocks_compatible_statement(
+                "CREATE TABLE IF NOT EXISTS SP.t (id BIGINT)"
+            ),
+        )
+        self.assertEqual(
+            "CREATE UNIQUE INDEX uq_t ON SP.t (id)",
+            goldilocks_compatible_statement(
+                "CREATE UNIQUE INDEX IF NOT EXISTS uq_t ON SP.t (id)"
+            ),
+        )
+        self.assertIn(
+            "FROM DUAL\nWHERE NOT EXISTS",
+            goldilocks_compatible_statement(
+                "INSERT INTO SP.data_provider (provider_code)\n"
+                "SELECT 'krx'\n"
+                "WHERE NOT EXISTS (SELECT 1 FROM SP.data_provider)"
+            ),
+        )
+
+    def test_sql_literal_escapes_values(self):
+        self.assertEqual("NULL", sql_literal(None))
+        self.assertEqual("TRUE", sql_literal(True))
+        self.assertEqual("42", sql_literal(42))
+        self.assertEqual("'can''t'", sql_literal("can't"))
+
+    def test_idempotent_create_detection_allows_leading_comments(self):
+        self.assertTrue(
+            is_idempotent_create_statement(
+                "-- migration\nCREATE SCHEMA IF NOT EXISTS SP"
+            )
+        )
 
     def test_build_plan_counts_statements_and_checksums(self):
         with TemporaryDirectory() as directory:

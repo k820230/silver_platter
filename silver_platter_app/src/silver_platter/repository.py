@@ -1,5 +1,7 @@
 import json
-from datetime import datetime
+import os
+from datetime import date, datetime
+from numbers import Number
 from typing import Dict, Optional
 
 from silver_platter.alerts import AlertDeliveryResult
@@ -48,6 +50,7 @@ class GoldilocksRepository:
                 auth_type
             )
             SELECT ?, ?, ?, ?, ?
+            FROM DUAL
             WHERE NOT EXISTS (
                 SELECT 1 FROM SP.data_provider WHERE provider_code = ?
             )
@@ -75,6 +78,7 @@ class GoldilocksRepository:
                 exchange_code
             )
             SELECT ?, ?, ?, ?, ?, ?, ?
+            FROM DUAL
             WHERE NOT EXISTS (
                 SELECT 1 FROM SP.security_master
                 WHERE market_code = ? AND symbol = ?
@@ -860,5 +864,48 @@ class GoldilocksRepository:
 
     def _execute(self, sql: str, params: tuple) -> object:
         cursor = self.connection.cursor()
-        cursor.execute(sql, params)
+        if _should_inline_params(self.connection):
+            cursor.execute(_inline_params(sql, params))
+            return cursor
+        try:
+            cursor.execute(sql, params)
+        except Exception as exc:
+            if not _is_parameter_binding_unsupported(exc):
+                raise
+            cursor.execute(_inline_params(sql, params))
         return cursor
+
+
+def _should_inline_params(connection: object) -> bool:
+    if os.getenv("GOLDILOCKS_INLINE_SQL_PARAMS", "").strip() == "1":
+        return True
+    return connection.__class__.__module__ == "pyodbc"
+
+
+def _is_parameter_binding_unsupported(exc: Exception) -> bool:
+    message = str(exc).lower()
+    return "sqlbindparameter" in message or "optional feature not implemented" in message
+
+
+def _sql_literal(value: object) -> str:
+    if value is None:
+        return "NULL"
+    if isinstance(value, bool):
+        return "TRUE" if value else "FALSE"
+    if isinstance(value, Number):
+        return str(value)
+    if isinstance(value, (datetime, date)):
+        return "'%s'" % value.isoformat(sep=" ")
+    return "'%s'" % str(value).replace("'", "''")
+
+
+def _inline_params(sql: str, params: tuple) -> str:
+    parts = sql.split("?")
+    if len(parts) - 1 != len(params):
+        raise ValueError("SQL placeholder count does not match parameter count")
+    rendered = []
+    for index, value in enumerate(params):
+        rendered.append(parts[index])
+        rendered.append(_sql_literal(value))
+    rendered.append(parts[-1])
+    return "".join(rendered)

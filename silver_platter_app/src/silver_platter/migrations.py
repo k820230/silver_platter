@@ -2,6 +2,7 @@ from dataclasses import dataclass
 import hashlib
 import os
 from pathlib import Path
+import re
 import sys
 from typing import Dict, Iterable, List, Sequence
 
@@ -174,9 +175,75 @@ def load_applied_migrations(connection: object) -> Dict[str, str]:
 def record_migration(connection: object, name: str, checksum: str) -> None:
     cursor = connection.cursor()
     cursor.execute(
-        "INSERT INTO SP.schema_migration_note (migration_name, checksum) VALUES (?, ?)",
-        (name, checksum),
+        "INSERT INTO SP.schema_migration_note (migration_name, checksum) "
+        "VALUES (%s, %s)" % (sql_literal(name), sql_literal(checksum))
     )
+
+
+def sql_literal(value: object) -> str:
+    if value is None:
+        return "NULL"
+    if isinstance(value, bool):
+        return "TRUE" if value else "FALSE"
+    if isinstance(value, (int, float)):
+        return str(value)
+    return "'%s'" % str(value).replace("'", "''")
+
+
+def goldilocks_compatible_statement(statement: str) -> str:
+    replacements = (
+        (r"\bCREATE\s+SCHEMA\s+IF\s+NOT\s+EXISTS\b", "CREATE SCHEMA"),
+        (r"\bCREATE\s+TABLE\s+IF\s+NOT\s+EXISTS\b", "CREATE TABLE"),
+        (r"\bCREATE\s+UNIQUE\s+INDEX\s+IF\s+NOT\s+EXISTS\b", "CREATE UNIQUE INDEX"),
+        (r"\bCREATE\s+INDEX\s+IF\s+NOT\s+EXISTS\b", "CREATE INDEX"),
+    )
+    compatible = statement
+    for pattern, replacement in replacements:
+        compatible = re.sub(pattern, replacement, compatible, flags=re.IGNORECASE)
+    return add_dual_to_insert_select_without_from(compatible)
+
+
+def add_dual_to_insert_select_without_from(statement: str) -> str:
+    upper = statement.upper()
+    if "INSERT INTO" not in upper or "WHERE NOT EXISTS" not in upper:
+        return statement
+    select_index = upper.find("SELECT")
+    where_index = upper.find("WHERE NOT EXISTS", select_index)
+    if select_index == -1 or where_index == -1:
+        return statement
+    select_clause = upper[select_index:where_index]
+    if re.search(r"\bFROM\b", select_clause):
+        return statement
+    return "%sFROM DUAL\n%s" % (statement[:where_index], statement[where_index:])
+
+
+def is_idempotent_create_statement(statement: str) -> bool:
+    return bool(
+        re.search(
+            r"\bCREATE\s+(SCHEMA|TABLE|UNIQUE\s+INDEX|INDEX)\s+IF\s+NOT\s+EXISTS\b",
+            statement,
+            flags=re.IGNORECASE,
+        )
+    )
+
+
+def is_duplicate_object_error(exc: Exception) -> bool:
+    message = str(exc).lower()
+    return (
+        "already exists" in message
+        or "duplicate" in message
+        or "same name" in message
+        or "already used" in message
+    )
+
+
+def execute_migration_statement(cursor: object, statement: str) -> None:
+    try:
+        cursor.execute(goldilocks_compatible_statement(statement))
+    except Exception as exc:
+        if is_idempotent_create_statement(statement) and is_duplicate_object_error(exc):
+            return
+        raise
 
 
 def apply_migrations(
@@ -204,7 +271,7 @@ def apply_migrations(
         cursor = connection.cursor()
         try:
             for statement in statements:
-                cursor.execute(statement)
+                execute_migration_statement(cursor, statement)
             record_migration(connection, path.name, checksum)
             connection.commit()
             applied[path.name] = checksum

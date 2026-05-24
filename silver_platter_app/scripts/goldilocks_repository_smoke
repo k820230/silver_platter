@@ -50,8 +50,8 @@ try:
     )
     cursor = connection.cursor()
     cursor.execute(
-        "SELECT provider_id FROM SP.data_provider WHERE provider_code = ?",
-        (smoke_provider.provider_code,),
+        "SELECT provider_id FROM SP.data_provider WHERE provider_code = '%s'"
+        % smoke_provider.provider_code.replace("'", "''")
     )
     row = cursor.fetchone()
     if row is None:

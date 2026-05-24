@@ -26,6 +26,7 @@ from silver_platter.providers import (
     sample_bar,
 )
 from silver_platter.repository import GoldilocksRepository
+from silver_platter.repository import _inline_params
 from silver_platter.risk import OrderRiskInput, evaluate_order_risk
 from silver_platter.risk_controls import headline_clusters_to_event_risk_signals
 from silver_platter.verification import (
@@ -56,6 +57,25 @@ class FakeConnection:
         self.commits += 1
 
 
+class BindingUnsupportedCursor:
+    def __init__(self, connection):
+        self.connection = connection
+
+    def execute(self, sql, params=None):
+        if params is not None:
+            raise RuntimeError("Optional feature not implemented: SQLBindParameter")
+        self.connection.commands.append((sql, params))
+        return self
+
+
+class BindingUnsupportedConnection:
+    def __init__(self):
+        self.commands = []
+
+    def cursor(self):
+        return BindingUnsupportedCursor(self)
+
+
 class RepositoryTests(TestCase):
     def test_upsert_provider_uses_idempotent_insert(self):
         connection = FakeConnection()
@@ -70,6 +90,7 @@ class RepositoryTests(TestCase):
 
         sql, params = connection.commands[0]
         self.assertIn("INSERT INTO SP.data_provider", sql)
+        self.assertIn("FROM DUAL", sql)
         self.assertIn("WHERE NOT EXISTS", sql)
         self.assertEqual("sec_edgar", params[0])
         self.assertEqual("sec_edgar", params[-1])
@@ -93,8 +114,35 @@ class RepositoryTests(TestCase):
 
         sql, params = connection.commands[0]
         self.assertIn("INSERT INTO SP.security_master", sql)
+        self.assertIn("FROM DUAL", sql)
         self.assertIn("market_code = ? AND symbol = ?", sql)
         self.assertEqual(("US", "AAPL"), params[-2:])
+
+    def test_execute_inlines_params_when_driver_rejects_binding(self):
+        connection = BindingUnsupportedConnection()
+        repository = GoldilocksRepository(connection)
+
+        repository.upsert_provider(
+            ProviderMetadata("provider'1", "headline", True, False, False),
+            provider_name="Provider One",
+            base_url=None,
+            auth_type="none",
+        )
+
+        sql, params = connection.commands[0]
+        self.assertIsNone(params)
+        self.assertIn("'provider''1'", sql)
+        self.assertIn("NULL", sql)
+
+    def test_inline_params_validates_placeholder_count(self):
+        with self.assertRaises(ValueError):
+            _inline_params("SELECT ? FROM DUAL WHERE x = ?", ("one",))
+
+    def test_inline_params_renders_bool_literals(self):
+        self.assertEqual(
+            "INSERT INTO t VALUES (TRUE, FALSE)",
+            _inline_params("INSERT INTO t VALUES (?, ?)", (True, False)),
+        )
 
     def test_insert_provider_symbol_map_persists_provider_mapping(self):
         connection = FakeConnection()
