@@ -70,6 +70,10 @@ curl -fsS -X POST "${API_URL}/api/audit/events" \
   -H 'Content-Type: application/json' \
   -d "{\"actor_type\":\"system\",\"actor_id\":\"smoke\",\"action_code\":\"SMOKE_API\",\"target_type\":\"api\",\"target_id\":\"smoke-${STAMP}\",\"detail\":{\"status\":\"pass\"}}" >/dev/null
 
+curl -fsS -X POST "${API_URL}/api/audit/setting-changes" \
+  -H 'Content-Type: application/json' \
+  -d '{"user_id":"smoke-user","session_id":"smoke-session","source":"smoke_api","target_id":"risk.max_order","before":{"max_order_krw":1000000},"after":{"max_order_krw":2000000}}' >/dev/null
+
 curl -fsS "${API_URL}/api/audit/events?action_code=SMOKE_API" >/dev/null
 
 curl -fsS -X POST "${API_URL}/api/operations/summary" \

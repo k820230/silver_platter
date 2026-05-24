@@ -1,6 +1,7 @@
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Dict, Iterable, List, Optional
+import json
+from typing import Any, Dict, Iterable, List, Optional
 
 
 @dataclass(frozen=True)
@@ -37,16 +38,26 @@ class AuditLog:
         actor_id: Optional[str] = None,
         target_id: Optional[str] = None,
         detail: Optional[Dict[str, str]] = None,
+        user_id: Optional[str] = None,
+        session_id: Optional[str] = None,
+        source: str = "",
         occurred_at: Optional[datetime] = None,
     ) -> AuditEvent:
+        event_detail = dict(detail or {})
+        if user_id:
+            event_detail.setdefault("actor_user_id", user_id)
+        if session_id:
+            event_detail.setdefault("actor_session_id", session_id)
+        if source:
+            event_detail.setdefault("actor_source", source)
         event = AuditEvent(
             actor_type=actor_type,
-            actor_id=actor_id,
+            actor_id=actor_id or user_id or session_id,
             action_code=action_code,
             target_type=target_type,
             target_id=target_id,
             occurred_at=occurred_at or datetime.utcnow(),
-            detail=detail or {},
+            detail=event_detail,
         )
         self.events.append(event)
         return event
@@ -76,3 +87,27 @@ def filter_audit_events(
             continue
         selected.append(event)
     return sorted(selected, key=lambda item: item.occurred_at)
+
+
+def build_setting_change_detail(
+    before: Dict[str, Any],
+    after: Dict[str, Any],
+) -> Dict[str, str]:
+    changed_keys = [
+        key
+        for key in sorted(set(before.keys()) | set(after.keys()))
+        if before.get(key) != after.get(key)
+    ]
+    return {
+        "changed_keys": ",".join(changed_keys),
+        "before": json.dumps(
+            {key: before.get(key) for key in changed_keys},
+            ensure_ascii=True,
+            sort_keys=True,
+        ),
+        "after": json.dumps(
+            {key: after.get(key) for key in changed_keys},
+            ensure_ascii=True,
+            sort_keys=True,
+        ),
+    }

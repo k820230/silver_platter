@@ -49,7 +49,7 @@ from silver_platter.replay import (
     run_exported_snapshot_replay,
 )
 from silver_platter.strategies import DEFAULT_STRATEGY_REGISTRY, StrategyContext
-from silver_platter.audit import AuditLog
+from silver_platter.audit import AuditLog, build_setting_change_detail
 from silver_platter.operations import (
     ComponentStatus,
     provider_health_components,
@@ -278,8 +278,22 @@ class AuditEventRequest(BaseModel):
     action_code: str
     target_type: str
     actor_id: Optional[str] = None
+    user_id: Optional[str] = None
+    session_id: Optional[str] = None
+    source: str = ""
     target_id: Optional[str] = None
     detail: Dict[str, str] = Field(default_factory=dict)
+
+
+class SettingChangeAuditRequest(BaseModel):
+    actor_type: str = "user"
+    actor_id: Optional[str] = None
+    user_id: Optional[str] = None
+    session_id: Optional[str] = None
+    source: str = ""
+    target_id: str
+    before: Dict[str, Any]
+    after: Dict[str, Any]
 
 
 class ComponentStatusRequest(BaseModel):
@@ -811,6 +825,25 @@ def audit_event_append(request: AuditEventRequest) -> Dict[str, Any]:
         target_type=request.target_type,
         target_id=request.target_id,
         detail=request.detail,
+        user_id=request.user_id,
+        session_id=request.session_id,
+        source=request.source,
+    )
+    return event.as_dict()
+
+
+@app.post("/api/audit/setting-changes")
+def audit_setting_change_append(request: SettingChangeAuditRequest) -> Dict[str, Any]:
+    event = AUDIT_LOG.append(
+        actor_type=request.actor_type,
+        actor_id=request.actor_id,
+        user_id=request.user_id,
+        session_id=request.session_id,
+        source=request.source,
+        action_code="SETTING_CHANGE",
+        target_type="setting",
+        target_id=request.target_id,
+        detail=build_setting_change_detail(request.before, request.after),
     )
     return event.as_dict()
 

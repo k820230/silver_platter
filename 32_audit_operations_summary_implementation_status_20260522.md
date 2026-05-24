@@ -23,6 +23,8 @@
 - audit event 모델
 - append-only log helper
 - action/target 기반 query
+- user/session/source actor context 기록
+- setting 변경 before/after diff detail 생성
 - API 응답용 dict 변환
 
 ### 3.2 Operations summary
@@ -66,6 +68,7 @@
 추가 endpoint:
 
 - `POST /api/audit/events`
+- `POST /api/audit/setting-changes`
 - `GET /api/audit/events`
 - `POST /api/operations/summary`
 - `GET /api/operations/provider-health`
@@ -83,6 +86,9 @@
 
 - audit append/query
 - target 기반 filter
+- audit actor context 기록
+- setting 변경 diff detail 저장
+- setting change audit API response
 - operations status escalation
 - provider health component mapping
 - provider health license-policy detail and block state
@@ -102,8 +108,6 @@
 
 - audit log 실제 Goldilocks writer smoke
   - `scripts/goldilocks_repository_smoke` 준비 완료, 기본은 rollback-only smoke opt-in 전 skip
-- user/session actor source 연결
-- setting 변경 diff 저장
 - 실제 webhook delivery smoke는 script 준비 완료, 현재 환경은 `ALERT_WEBHOOK_URL` 없음
 
 ## 6. 검증 명령

@@ -140,6 +140,9 @@
 - backup status API restore drill evidence response
 - backup status API smoke response validation
 - audit
+- audit actor context
+- setting change audit diff
+- setting change audit API
 - operations
 - provider health component mapping
 - provider health license-policy detail
@@ -160,7 +163,7 @@
 - verification status UI card
 - migration coverage
 
-현재 테스트 수: 203개
+현재 테스트 수: 206개
 
 ## 7. 검증 증적
 
@@ -198,6 +201,7 @@
   - `/api/orders/submit`
   - `/api/ml/jobs/run`
   - `/api/backtests/run`
+  - `/api/audit/setting-changes`
   - `/api/backtests/replay-exported-snapshot`
   - `/api/backtests/strategy-plugins`
   - `/api/headlines/risk-signals`

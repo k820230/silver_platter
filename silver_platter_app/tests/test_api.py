@@ -19,10 +19,12 @@ from silver_platter.api.main import (
     backtest_strategy_plugins,
     headline_risk_signals,
     HeadlineRiskSignalsRequest,
+    audit_setting_change_append,
     ml_job_run,
     operations_backup_status,
     operations_provider_health,
     provider_catalog,
+    SettingChangeAuditRequest,
     watchlist_add,
     watchlist_list,
     watchlist_remove,
@@ -30,6 +32,7 @@ from silver_platter.api.main import (
 )
 from silver_platter.backup import build_backup_manifest, write_backup_manifest
 from silver_platter.exports import export_price_bars_partitioned
+from silver_platter.audit import AuditLog
 from silver_platter.ml_ops import WatchlistRegistry
 from silver_platter.providers import sample_bar
 
@@ -160,6 +163,26 @@ class ApiBoundaryTests(TestCase):
         self.assertTrue(ofac_policy["can_transform"])
         self.assertFalse(ofac_policy["can_display_realtime"])
         self.assertFalse(ofac_policy["can_redistribute"])
+
+    def test_setting_change_audit_endpoint_records_diff_and_actor_context(self):
+        api_main.AUDIT_LOG = AuditLog()
+
+        payload = audit_setting_change_append(
+            SettingChangeAuditRequest(
+                user_id="u1",
+                session_id="s1",
+                source="web",
+                target_id="risk.max_order",
+                before={"max_order_krw": 1_000_000},
+                after={"max_order_krw": 2_000_000},
+            )
+        )
+
+        self.assertEqual("SETTING_CHANGE", payload["action_code"])
+        self.assertEqual("u1", payload["actor_id"])
+        self.assertEqual("u1", payload["detail"]["actor_user_id"])
+        self.assertIn("max_order_krw", payload["detail"]["changed_keys"])
+        self.assertIn("1000000", payload["detail"]["before"])
 
     def test_backup_status_endpoint_reports_invalid_manifest_as_critical(self):
         with TemporaryDirectory() as tmp:
