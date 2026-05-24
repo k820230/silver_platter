@@ -219,6 +219,30 @@ type HeadlineRiskResponse = {
   signals: HeadlineRiskSignal[];
 };
 
+type HistoryPrefetchResult = {
+  security_id: string;
+  market_code: string;
+  provider_code: string;
+  status: string;
+  is_new_security: boolean;
+  bar_count: number;
+  existing_bar_count: number;
+  quality_status: string;
+  storage_uri: string;
+  detail: string;
+};
+
+type SecuritySearchResponse = {
+  security: {
+    security_id: string;
+    provider_symbol: string;
+    market_code: string;
+    currency: string;
+    exchange_code: string;
+  };
+  history_prefetch: HistoryPrefetchResult;
+};
+
 type StrategyPlugin = {
   plugin_id: string;
   name: string;
@@ -379,16 +403,50 @@ function backupStatusDetail(status: BackupStatusResponse): string {
 
 function statusTone(value: string | undefined): string {
   const normalized = (value ?? "").toLowerCase();
-  if (["ok", "pass", "ready", "accepted", "filled"].includes(normalized)) {
+  if (
+    ["ok", "pass", "ready", "accepted", "filled", "stored", "skipped_existing_history"].includes(
+      normalized,
+    )
+  ) {
     return "ok";
   }
   if (["blocked", "failed", "critical", "rejected", "block"].includes(normalized)) {
     return "critical";
   }
-  if (["degraded", "warning", "watch"].includes(normalized)) {
+  if (
+    [
+      "degraded",
+      "warning",
+      "watch",
+      "no_data",
+      "skipped_disabled",
+      "skipped_unconfigured",
+      "skipped_provider_unconfigured",
+      "skipped_unsupported_market",
+    ].includes(normalized)
+  ) {
     return "watch";
   }
   return "neutral";
+}
+
+function historyPrefetchLabel(result: HistoryPrefetchResult | null, state: RequestState): string {
+  if (state === "loading") {
+    return "History loading";
+  }
+  if (state === "error") {
+    return "History failed";
+  }
+  if (!result) {
+    return "History idle";
+  }
+  if (result.status === "stored") {
+    return `History stored ${result.bar_count.toLocaleString("en-US")} bars`;
+  }
+  if (result.status === "skipped_existing_history") {
+    return `History ready ${result.existing_bar_count.toLocaleString("en-US")} bars`;
+  }
+  return `History ${statusLabel(result.status)}`;
 }
 
 function orderPayload(form: OrderForm) {
@@ -672,8 +730,10 @@ function App() {
   const [data, setData] = useState<DashboardData>(EMPTY_DASHBOARD);
   const [preview, setPreview] = useState<OrderPreviewResponse | null>(null);
   const [submission, setSubmission] = useState<OrderSubmitResponse | null>(null);
+  const [historyPrefetch, setHistoryPrefetch] = useState<HistoryPrefetchResult | null>(null);
   const [state, setState] = useState<RequestState>("idle");
   const [actionState, setActionState] = useState<RequestState>("idle");
+  const [historyState, setHistoryState] = useState<RequestState>("idle");
   const [error, setError] = useState<string>("");
 
   const refresh = useCallback(async (nextForm: OrderForm = form) => {
@@ -740,6 +800,23 @@ function App() {
     } catch (exc) {
       setActionState("error");
       setError(exc instanceof Error ? exc.message : "order submission failed");
+    }
+  };
+
+  const prepareSecurityHistory = async () => {
+    setHistoryState("loading");
+    setError("");
+    try {
+      const result = await apiPost<SecuritySearchResponse>("/api/securities/search", {
+        security_id: form.securityId.trim() || DEFAULT_ORDER.securityId,
+        market: form.market,
+        prefetch_history: true,
+      });
+      setHistoryPrefetch(result.history_prefetch);
+      setHistoryState("ready");
+    } catch (exc) {
+      setHistoryState("error");
+      setError(exc instanceof Error ? exc.message : "history prefetch failed");
     }
   };
 
@@ -871,12 +948,26 @@ function App() {
           <div className="ticket-grid">
             <label>
               Security
-              <input
-                value={form.securityId}
-                onChange={(event) =>
-                  setForm((current) => ({ ...current, securityId: event.target.value }))
-                }
-              />
+              <div className="inline-input-action">
+                <input
+                  value={form.securityId}
+                  onChange={(event) => {
+                    setHistoryPrefetch(null);
+                    setHistoryState("idle");
+                    setForm((current) => ({ ...current, securityId: event.target.value }));
+                  }}
+                />
+                <button
+                  type="button"
+                  className="icon-button inline-icon-button"
+                  title="Prepare history"
+                  aria-label="Prepare history"
+                  onClick={prepareSecurityHistory}
+                  disabled={historyState === "loading"}
+                >
+                  <Database size={16} />
+                </button>
+              </div>
             </label>
             <label>
               Side
@@ -922,9 +1013,11 @@ function App() {
               Market
               <select
                 value={form.market}
-                onChange={(event) =>
-                  setForm((current) => ({ ...current, market: event.target.value }))
-                }
+                onChange={(event) => {
+                  setHistoryPrefetch(null);
+                  setHistoryState("idle");
+                  setForm((current) => ({ ...current, market: event.target.value }));
+                }}
               >
                 <option value="KR">KR</option>
                 <option value="US">US</option>
@@ -979,6 +1072,17 @@ function App() {
               Paper Submit
             </button>
           </div>
+
+          {historyState !== "idle" || historyPrefetch ? (
+            <div
+              className={`history-strip ${statusTone(
+                historyState === "error" ? "failed" : historyPrefetch?.status,
+              )}`}
+            >
+              <Database size={16} />
+              <span>{historyPrefetchLabel(historyPrefetch, historyState)}</span>
+            </div>
+          ) : null}
 
           <div className="decision-band">
             <span>Amount</span>

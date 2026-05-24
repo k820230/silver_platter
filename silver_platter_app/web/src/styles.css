@@ -198,6 +198,17 @@ select {
   width: 100%;
 }
 
+.inline-input-action {
+  display: grid;
+  gap: 6px;
+  grid-template-columns: minmax(0, 1fr) 38px;
+}
+
+.inline-icon-button {
+  height: 38px;
+  width: 38px;
+}
+
 .ticket-actions {
   display: flex;
   gap: 8px;
@@ -221,6 +232,24 @@ select {
   background: #255b72;
   border-color: #255b72;
   color: #ffffff;
+}
+
+.history-strip {
+  align-items: center;
+  background: #f6f8f9;
+  border: 1px solid #dce3e8;
+  border-radius: 8px;
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+  min-height: 36px;
+  padding: 0 10px;
+}
+
+.history-strip span {
+  font-size: 12px;
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .decision-band,
