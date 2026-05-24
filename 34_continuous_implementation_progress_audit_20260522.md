@@ -220,6 +220,7 @@
 - 실제 Goldilocks 대상 `./scripts/migrate apply` 통과: 11개 migration applied/skipped 기록 확인
 - `./scripts/goldilocks_odbc_smoke` 통과: migration_count=11, applied_count=11
 - `GOLDILOCKS_REPOSITORY_SMOKE_WRITE=1 ./scripts/goldilocks_repository_smoke` 통과: provider/license/audit/scenario/restore/headline writer rollback 확인
+- `./scripts/collect_verification_evidence --skip-check --run-smoke-api --no-backup --write-goldilocks --output var/verification/evidence-bundle-goldilocks-smoke.json` 통과: G2 assessment/evidence Goldilocks persistence path 확인
 - `./scripts/kis_orderable_smoke` 통과: `005930` 매수가능조회 응답 확인
 - `./scripts/sec_edgar_smoke` skip 확인: placeholder User-Agent
 - `./scripts/opendart_smoke` skip 확인: OPENDART_API_KEY 설정 없음
