@@ -81,13 +81,13 @@
 
 | 항목 | 확인 |
 | --- | --- |
-| Docker Compose dev profile 기동 | [ ] |
+| Docker Compose dev profile 기동 | [x] |
 | PostgreSQL 서비스 없음 | [x] |
 | Goldilocks 연결 성공 | [ ] |
-| Redis 연결 성공 | [ ] |
+| Redis 연결 성공 | [x] |
 | API `/health` 정상 | [x] |
 | Web UI 접속 가능 | [x] |
-| worker heartbeat 정상 | [ ] |
+| worker heartbeat 정상 | [x] |
 | scheduler timezone `Asia/Seoul` | [x] |
 | `.env` 비밀값 git 제외 | [x] |
 | 로그 경로 쓰기 가능 | [x] |
