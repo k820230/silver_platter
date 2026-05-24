@@ -1,0 +1,157 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+PROJECT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+
+PYTHONPATH="${PYTHONPATH:+${PYTHONPATH}:}${PROJECT_ROOT}/src" python3 - "$@" <<'PY'
+import argparse
+from datetime import datetime
+import json
+import os
+from pathlib import Path
+import sys
+from typing import Dict, List
+
+from silver_platter.migrations import (
+    build_migration_plan,
+    connect_goldilocks_from_env,
+    list_migrations,
+    load_applied_migrations,
+)
+
+
+TABLES = (
+    "SP.schema_migration_note",
+    "SP.data_provider",
+    "SP.security_master",
+    "SP.provider_symbol_map",
+    "SP.raw_data_manifest",
+    "SP.data_quality_run",
+    "SP.price_bar",
+    "SP.user_watchlist",
+    "SP.verification_gate_assessment",
+    "SP.verification_gate_evidence",
+    "SP.restore_check_run",
+)
+REQUIRED_TABLES = {
+    "SP.schema_migration_note",
+    "SP.data_provider",
+    "SP.security_master",
+    "SP.price_bar",
+}
+
+
+def _write_json(path: Path, payload: object) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        json.dumps(payload, ensure_ascii=True, sort_keys=True, indent=2),
+        encoding="utf-8",
+    )
+
+
+def _short_error(exc: Exception) -> str:
+    return str(exc).splitlines()[0][:240]
+
+
+def _table_counts(connection: object) -> List[Dict[str, object]]:
+    results: List[Dict[str, object]] = []
+    for table_name in TABLES:
+        cursor = connection.cursor()
+        try:
+            cursor.execute("SELECT COUNT(*) FROM %s" % table_name)
+            row = cursor.fetchone()
+        except Exception as exc:
+            results.append(
+                {
+                    "table": table_name,
+                    "status": "unavailable",
+                    "error": _short_error(exc),
+                }
+            )
+            continue
+        results.append(
+            {
+                "table": table_name,
+                "status": "ok",
+                "row_count": 0 if row is None else int(row[0]),
+            }
+        )
+    return results
+
+
+def _migration_status(connection: object) -> Dict[str, object]:
+    planned = build_migration_plan(list_migrations())
+    applied = load_applied_migrations(connection)
+    return {
+        "planned_count": len(planned),
+        "applied_count": len(applied),
+        "planned": [
+            {
+                "migration_name": item.name,
+                "checksum": item.checksum,
+                "statement_count": item.statement_count,
+                "applied": applied.get(item.name) == item.checksum,
+            }
+            for item in planned
+        ],
+    }
+
+
+def main(argv: List[str]) -> int:
+    parser = argparse.ArgumentParser(
+        description="Write a restorable logical Goldilocks backup payload."
+    )
+    parser.add_argument(
+        "--output-dir",
+        default=os.getenv(
+            "GOLDILOCKS_LOGICAL_BACKUP_OUTPUT_DIR",
+            "goldilocks/logical",
+        ),
+    )
+    args = parser.parse_args(argv)
+
+    generated_at = datetime.utcnow().isoformat()
+    output_dir = Path(args.output_dir)
+    connection = connect_goldilocks_from_env()
+    try:
+        migrations = _migration_status(connection)
+        counts = _table_counts(connection)
+    finally:
+        close = getattr(connection, "close", None)
+        if close is not None:
+            close()
+
+    unavailable_required = sorted(
+        item["table"]
+        for item in counts
+        if item["table"] in REQUIRED_TABLES and item["status"] != "ok"
+    )
+    summary = {
+        "backup_kind": "goldilocks_logical_snapshot",
+        "dbms": "goldilocks",
+        "generated_at": generated_at,
+        "status": "ok" if not unavailable_required else "failed",
+        "required_table_count": len(REQUIRED_TABLES),
+        "unavailable_required_tables": unavailable_required,
+    }
+
+    _write_json(output_dir / "summary.json", summary)
+    _write_json(output_dir / "migration_status.json", migrations)
+    _write_json(
+        output_dir / "table_counts.json",
+        {"generated_at": generated_at, "tables": counts},
+    )
+
+    if unavailable_required:
+        raise SystemExit(
+            "required Goldilocks tables are unavailable: %s"
+            % ", ".join(unavailable_required)
+        )
+    print("Goldilocks logical backup payload written: %s" % output_dir)
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main(sys.argv[1:]))
+PY

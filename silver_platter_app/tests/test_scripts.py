@@ -338,3 +338,42 @@ class ScriptHelperTests(TestCase):
             )
 
             self.assertIn('"requirement_id": "web_health"', output.read_text(encoding="utf-8"))
+
+    def test_goldilocks_logical_backup_creates_manifest_with_override_payload(self):
+        source_root = Path(__file__).resolve().parents[1]
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self._copy_scripts(
+                root,
+                [
+                    "goldilocks_logical_backup",
+                    "goldilocks_backup.sh",
+                    "load_local_env",
+                ],
+            )
+            shutil.copytree(source_root / "src", root / "src")
+            backup_base = root / "backup"
+
+            result = subprocess.run(
+                ["bash", "scripts/goldilocks_logical_backup"],
+                cwd=root,
+                env={
+                    **self._script_env(),
+                    "BACKUP_BASE_DIR": str(backup_base),
+                    "BACKUP_DATE": "2026-05-24",
+                    "GOLDILOCKS_LOGICAL_BACKUP_COMMAND": (
+                        "mkdir -p goldilocks/logical && "
+                        "printf '%s\\n' '{\"status\":\"ok\"}' "
+                        "> goldilocks/logical/summary.json"
+                    ),
+                },
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+
+            backup_dir = backup_base / "2026-05-24"
+            self.assertTrue((backup_dir / "goldilocks/logical/summary.json").exists())
+            self.assertTrue((backup_dir / "manifest.json").exists())
+            self.assertTrue((backup_dir / "manifest.sha256").exists())
+            self.assertIn("Goldilocks backup completed", result.stdout)

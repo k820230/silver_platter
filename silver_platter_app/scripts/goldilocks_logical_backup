@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+cd "$(dirname "$0")/.."
+. scripts/load_local_env
+
+PROJECT_ROOT="$(pwd)"
+printf -v DEFAULT_LOGICAL_BACKUP_COMMAND '%q' "${PROJECT_ROOT}/scripts/write_goldilocks_logical_backup_payload"
+BACKUP_COMMAND="${GOLDILOCKS_BACKUP_COMMAND:-${GOLDILOCKS_LOGICAL_BACKUP_COMMAND:-${DEFAULT_LOGICAL_BACKUP_COMMAND}}}"
+
+GOLDILOCKS_BACKUP_COMMAND="${BACKUP_COMMAND}" ./scripts/goldilocks_backup.sh
