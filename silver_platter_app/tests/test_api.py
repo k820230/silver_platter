@@ -250,6 +250,8 @@ class ApiBoundaryTests(TestCase):
 
         self.assertEqual(203.0, payload["predictions"][0]["actual_price"])
         self.assertIsNotNone(payload["predictions"][0]["absolute_error"])
+        self.assertEqual(1, payload["error_summary"]["sample_count"])
+        self.assertGreater(payload["error_summary"]["mean_absolute_error"], 0)
 
     def test_headline_risk_signals_endpoint_deduplicates_and_maps_signal(self):
         payload = headline_risk_signals(

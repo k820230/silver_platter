@@ -83,6 +83,7 @@
 - due prediction actual 자동 매칭
 - not-due/unavailable price bar 자동 매칭 제외
 - ML job API actual bar matching
+- ML job API error summary response
 - error summary
 - 지수 chart filtering/sorting
 

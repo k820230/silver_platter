@@ -85,6 +85,9 @@ type StoredPrediction = {
   horizon: string;
   target_at: string;
   interval: PredictionInterval;
+  actual_price: number | null;
+  absolute_error: number | null;
+  pct_error: number | null;
 };
 
 type MlJobResponse = {
@@ -92,6 +95,12 @@ type MlJobResponse = {
     job_id: string;
     security_id: string;
     status: string;
+  };
+  error_summary: {
+    security_id: string;
+    sample_count: number;
+    mean_absolute_error: number;
+    mean_absolute_pct_error: number;
   };
   predictions: StoredPrediction[];
 };
@@ -991,6 +1000,10 @@ function App() {
             <div>
               <dt>Risk</dt>
               <dd>{latestPrediction ? formatNumber(latestPrediction.interval.risk_score, 1) : "Unknown"}</dd>
+            </div>
+            <div>
+              <dt>MAE</dt>
+              <dd>{data.mlJob ? formatNumber(data.mlJob.error_summary.mean_absolute_error, 2) : "Unknown"}</dd>
             </div>
           </dl>
         </article>

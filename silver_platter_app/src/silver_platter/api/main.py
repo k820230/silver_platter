@@ -30,6 +30,7 @@ from silver_platter.ml_ops import (
     create_prediction_job,
     match_due_prediction_actuals,
     run_prediction_job,
+    summarize_prediction_errors,
 )
 from silver_platter.broker import KoreaInvestmentBrokerAdapter, PaperBrokerAdapter
 from silver_platter.risk_controls import headline_clusters_to_event_risk_signals
@@ -479,6 +480,7 @@ def ml_job_run(request: MlPredictionJobRequest) -> Dict[str, Any]:
         )
     return {
         "job": job.__dict__,
+        "error_summary": summarize_prediction_errors(predictions, job.security_id).__dict__,
         "predictions": [
             {
                 **prediction.__dict__,

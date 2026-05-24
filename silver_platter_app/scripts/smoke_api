@@ -32,6 +32,8 @@ payload = json.load(sys.stdin)
 prediction = payload["predictions"][0]
 if prediction["actual_price"] != 203.0 or prediction["absolute_error"] is None:
     raise SystemExit("unexpected ML actual matching response: %s" % payload)
+if payload["error_summary"]["sample_count"] != 1:
+    raise SystemExit("unexpected ML error summary response: %s" % payload)
 ' >/dev/null
 
 curl -fsS -X POST "${API_URL}/api/indices/chart" \
