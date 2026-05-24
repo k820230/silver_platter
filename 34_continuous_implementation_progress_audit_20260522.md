@@ -160,6 +160,7 @@
 - backup status G8 evidence conversion
 - verification evidence bundle JSON persistence
 - verification evidence collection script
+- verification operations checklist reconciliation
 - verification status UI card
 - migration coverage
 
