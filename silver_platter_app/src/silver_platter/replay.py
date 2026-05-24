@@ -33,6 +33,7 @@ class ExportedSnapshotReplayConfig:
     required_min_days: int = 1
     strategy_plugin_id: str = "fixed-close"
     strategy_parameters: Optional[dict] = None
+    replay_seed: str = ""
 
 
 @dataclass(frozen=True)
@@ -57,6 +58,7 @@ class ExportedSnapshotReplayResult:
             "replay_bar_count": self.replay_bar_count,
             "source_paths": self.source_paths,
             "strategy_parameters": self.config.strategy_parameters or {},
+            "replay_seed": self.backtest.replay_seed,
             "ending_cash_krw": self.backtest.ending_cash_krw,
             "realized_pnl_krw": self.backtest.realized_pnl_krw,
             "blocked_order_count": self.backtest.blocked_order_count,
@@ -103,6 +105,7 @@ def run_exported_snapshot_replay(
             from_date=config.from_date,
             to_date=config.to_date,
             initial_cash_krw=config.initial_cash_krw,
+            replay_seed=config.replay_seed,
         ),
         replay_bars,
         strategy,
@@ -148,6 +151,7 @@ def _parse_args(argv: Sequence[str]) -> argparse.Namespace:
     parser.add_argument("--required-min-days", type=int, default=1)
     parser.add_argument("--strategy-plugin-id", default="fixed-close")
     parser.add_argument("--strategy-parameter", action="append", default=[])
+    parser.add_argument("--replay-seed", default="")
     return parser.parse_args(argv)
 
 
@@ -188,6 +192,7 @@ def main(argv: Sequence[str]) -> int:
             required_min_days=args.required_min_days,
             strategy_plugin_id=args.strategy_plugin_id,
             strategy_parameters=strategy_parameters,
+            replay_seed=args.replay_seed,
         )
     )
     print(json.dumps(result.as_dict(), sort_keys=True, ensure_ascii=True, default=_json_default))

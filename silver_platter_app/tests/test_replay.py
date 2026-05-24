@@ -41,6 +41,7 @@ class ExportedSnapshotReplayTests(TestCase):
                     market="US",
                     quantity=1,
                     required_min_days=2,
+                    replay_seed="seed-1",
                 )
             )
 
@@ -51,6 +52,7 @@ class ExportedSnapshotReplayTests(TestCase):
         self.assertEqual("pass", result.paper_replay_evidence.status)
         self.assertEqual(3.0, result.backtest.metrics["loaded_bar_count"])
         self.assertEqual(2.0, result.backtest.metrics["replay_bar_count"])
+        self.assertEqual("seed-1", result.as_dict()["replay_seed"])
 
     def test_run_exported_snapshot_replay_fails_when_security_missing(self):
         bars = [sample_bar("MSFT", datetime(2026, 5, 22, 9, 0, 0), 410.0)]

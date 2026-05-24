@@ -120,6 +120,7 @@
 - paper replay evidence
 - exported snapshot replay
 - exported snapshot path/directory replay runner
+- replay seed reproducibility
 - strategy plugin registry
 - API strategy/replay error boundary
 - provider health API
@@ -174,7 +175,7 @@
 - verification status UI card
 - migration coverage
 
-현재 테스트 수: 213개
+현재 테스트 수: 214개
 
 ## 7. 검증 증적
 

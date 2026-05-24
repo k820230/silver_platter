@@ -11,6 +11,7 @@ from silver_platter.backtest import (
     apply_scenario_shock,
     assert_no_lookahead,
     build_paper_replay_evidence,
+    derive_replay_seed,
     run_backtest,
 )
 from silver_platter.data_quality import PriceBarInput
@@ -68,6 +69,22 @@ class BacktestTests(TestCase):
         self.assertTrue(result.order_events[0].accepted)
         self.assertEqual(1.0, result.metrics["replay_day_count"])
         self.assertEqual(1.0, result.metrics["accepted_order_count"])
+        self.assertEqual(64, len(result.replay_seed))
+
+    def test_derive_replay_seed_is_stable_for_same_inputs(self):
+        config = BacktestRunConfig("bt-seed", "s1", date(2026, 5, 22), date(2026, 5, 22))
+        bars = [
+            PriceBarInput(
+                "AAPL",
+                datetime(2026, 5, 22, 9, 0, 0),
+                20000,
+                1000,
+                20_000_000,
+                datetime(2026, 5, 22, 9, 0, 0),
+            )
+        ]
+
+        self.assertEqual(derive_replay_seed(config, bars), derive_replay_seed(config, bars))
 
     def test_build_paper_replay_evidence_passes_clean_simulation(self):
         result = BacktestResult(

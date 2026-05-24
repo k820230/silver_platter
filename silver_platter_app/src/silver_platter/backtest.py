@@ -1,5 +1,7 @@
 from dataclasses import dataclass, field
 from datetime import date, datetime
+import hashlib
+import json
 from typing import Callable, Dict, Iterable, List, Optional
 
 from silver_platter.data_quality import PriceBarInput
@@ -26,6 +28,7 @@ class BacktestRunConfig:
     to_date: date
     initial_cash_krw: float = 100_000_000.0
     market_scope: str = "BOTH"
+    replay_seed: str = ""
 
 
 @dataclass(frozen=True)
@@ -46,6 +49,7 @@ class BacktestResult:
     blocked_order_count: int
     lookahead_violation_count: int
     metrics: Dict[str, float] = field(default_factory=dict)
+    replay_seed: str = ""
 
 
 @dataclass(frozen=True)
@@ -96,6 +100,34 @@ class ScenarioResult:
 StrategyFn = Callable[[PriceBarInput], Optional[StrategyOrderCandidate]]
 
 
+def derive_replay_seed(config: BacktestRunConfig, bars: Iterable[PriceBarInput]) -> str:
+    payload = {
+        "run_id": config.run_id,
+        "strategy_id": config.strategy_id,
+        "from_date": config.from_date.isoformat(),
+        "to_date": config.to_date.isoformat(),
+        "initial_cash_krw": config.initial_cash_krw,
+        "market_scope": config.market_scope,
+        "bars": [
+            {
+                "security_id": bar.security_id,
+                "bar_ts": bar.bar_ts.isoformat(),
+                "close_price": bar.close_price,
+                "volume": bar.volume,
+                "turnover_krw": bar.turnover_krw,
+                "available_to_model_at": (
+                    None
+                    if bar.available_to_model_at is None
+                    else bar.available_to_model_at.isoformat()
+                ),
+            }
+            for bar in sorted(bars, key=lambda item: (item.security_id, item.bar_ts))
+        ],
+    }
+    encoded = json.dumps(payload, ensure_ascii=True, sort_keys=True).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
+
+
 def assert_no_lookahead(bars: Iterable[PriceBarInput], decision_at: datetime) -> int:
     violations = 0
     for bar in bars:
@@ -110,6 +142,7 @@ def run_backtest(
     strategy: StrategyFn,
 ) -> BacktestResult:
     sorted_bars = sorted(list(bars), key=lambda item: item.bar_ts)
+    replay_seed = config.replay_seed or derive_replay_seed(config, sorted_bars)
     account = VirtualAccount(config.run_id, cash_krw=config.initial_cash_krw)
     engine = SimulationEngine(account)
     events: List[BacktestOrderEvent] = []
@@ -166,6 +199,7 @@ def run_backtest(
             "blocked_order_count": float(blocked),
             "replay_day_count": float(replay_day_count),
         },
+        replay_seed=replay_seed,
     )
 
 

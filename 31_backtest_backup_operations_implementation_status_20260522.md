@@ -37,6 +37,7 @@
   - required minimum day 기준 pass/fail
 - exported snapshot 기반 replay 입력 로딩
 - jsonl/parquet snapshot path 또는 directory 기반 replay runner
+- replay seed 보존 및 입력 기반 deterministic seed hash 생성
 - strategy plugin registry
 - built-in fixed-close strategy plugin
 - built-in momentum-threshold strategy plugin
@@ -112,6 +113,7 @@
 - paper replay broker-send attempt 실패 처리
 - exported snapshot file 기반 backtest 실행
 - exported snapshot path/directory 기반 replay runner
+- replay seed 재현
 - replay runner CLI JSON output
 - strategy plugin registry와 built-in plugin 목록
 - momentum-threshold strategy plugin 주문 발생 조건
