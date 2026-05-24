@@ -201,6 +201,8 @@ def run_prediction_job(
         version=model.version,
         horizons=job.horizons,
         fine_tuned=model.fine_tuned,
+        fine_tune_reason=model.fine_tune_reason,
+        feature_set_version=model.feature_set_version,
         status=model.status,
     )
     predictions = predict_security_metrics(model, snapshot)

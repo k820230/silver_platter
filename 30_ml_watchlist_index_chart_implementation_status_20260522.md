@@ -36,6 +36,8 @@
 - 기존 baseline prediction engine과 연결
 - job 결과를 stored prediction 모델로 변환
 - model registry artifact JSON 저장/복구
+- model fine-tuning 적용/미적용 사유 artifact 저장
+- model feature set version artifact 저장
 - in-memory prediction job queue
 - RQ 호환 `queue.enqueue()` 경계 helper
 
@@ -100,6 +102,7 @@
 - in-memory ML job queue FIFO 실행
 - RQ enqueue boundary
 - model registry artifact round trip
+- model fine-tuning reason/feature set artifact round trip
 - stored prediction 생성
 - actual price 연결
 - due prediction actual 자동 매칭

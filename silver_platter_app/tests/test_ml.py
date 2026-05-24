@@ -45,6 +45,8 @@ class MlTests(TestCase):
                     version="2026.05",
                     horizons=("1d", "1w"),
                     fine_tuned=False,
+                    fine_tune_reason="insufficient clean history",
+                    feature_set_version="features-v2",
                     status="candidate",
                 )
             )
@@ -57,6 +59,8 @@ class MlTests(TestCase):
         self.assertEqual("2026.05", spec.version)
         self.assertEqual(("1d", "1w"), spec.horizons)
         self.assertFalse(spec.fine_tuned)
+        self.assertEqual("insufficient clean history", spec.fine_tune_reason)
+        self.assertEqual("features-v2", spec.feature_set_version)
         self.assertEqual("candidate", spec.status)
 
     def test_missing_model_registry_artifact_loads_empty_registry(self):

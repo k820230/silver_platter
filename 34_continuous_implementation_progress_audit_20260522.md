@@ -97,6 +97,8 @@
 - OFAC Recent Actions headline metadata normalization
 - ML ops
 - model registry artifact persistence
+- model fine-tuning reason artifact persistence
+- model feature set artifact persistence
 - ML job queue fallback
 - ML job RQ enqueue boundary
 - watchlist JSON persistence

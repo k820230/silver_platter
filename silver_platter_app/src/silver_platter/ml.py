@@ -21,6 +21,8 @@ class ModelSpec:
     version: str
     horizons: Tuple[str, ...] = ("1d", "1w", "1m", "3m")
     fine_tuned: bool = True
+    fine_tune_reason: str = "security-specific baseline enabled"
+    feature_set_version: str = "baseline-price-volume-risk-v1"
     status: str = "active"
 
 
@@ -76,6 +78,8 @@ def _model_spec_to_dict(spec: ModelSpec) -> dict:
         "version": spec.version,
         "horizons": list(spec.horizons),
         "fine_tuned": spec.fine_tuned,
+        "fine_tune_reason": spec.fine_tune_reason,
+        "feature_set_version": spec.feature_set_version,
         "status": spec.status,
     }
 
@@ -87,6 +91,12 @@ def _model_spec_from_dict(payload: dict) -> ModelSpec:
         version=str(payload["version"]),
         horizons=tuple(payload.get("horizons", ("1d", "1w", "1m", "3m"))),
         fine_tuned=bool(payload.get("fine_tuned", True)),
+        fine_tune_reason=str(
+            payload.get("fine_tune_reason", "security-specific baseline enabled")
+        ),
+        feature_set_version=str(
+            payload.get("feature_set_version", "baseline-price-volume-risk-v1")
+        ),
         status=str(payload.get("status", "active")),
     )
 
