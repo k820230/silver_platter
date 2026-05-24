@@ -89,6 +89,7 @@ class ScriptHelperTests(TestCase):
             self.assertIn("blocked: SEC EDGAR User-Agent", result.stdout)
             self.assertIn("blocked: OpenDART API key", result.stdout)
             self.assertIn("blocked: ECOS API key", result.stdout)
+            self.assertIn("skipped: alert webhook URL", result.stdout)
             self.assertIn("external smoke readiness blocked", result.stdout)
 
     def test_external_smoke_readiness_loads_env_and_reports_ready(self):

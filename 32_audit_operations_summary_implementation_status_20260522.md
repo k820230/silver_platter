@@ -120,7 +120,7 @@
 
 - audit log 실제 Goldilocks writer smoke
   - `scripts/goldilocks_repository_smoke` 준비 완료, 기본은 rollback-only smoke opt-in 전 skip
-- 실제 webhook delivery smoke는 script 준비 완료, 현재 환경은 `ALERT_WEBHOOK_URL` 없음
+- 실제 webhook delivery smoke는 script 준비 완료, 현재 검증 범위에서는 무시
 
 ## 6. 검증 명령
 

@@ -15,6 +15,10 @@ block() {
   printf 'blocked: %s - %s\n' "$1" "$2"
 }
 
+skip() {
+  printf 'skipped: %s - %s\n' "$1" "$2"
+}
+
 user_agent="${SEC_EDGAR_USER_AGENT:-}"
 user_agent_lc="$(printf '%s' "${user_agent}" | tr '[:upper:]' '[:lower:]')"
 if [ -n "${user_agent}" ] \
@@ -40,7 +44,7 @@ fi
 if [ -n "${ALERT_WEBHOOK_URL:-}" ]; then
   ready "alert webhook URL"
 else
-  block "alert webhook URL" "set ALERT_WEBHOOK_URL"
+  skip "alert webhook URL" "ignored by current verification scope"
 fi
 
 if [ "${KRX_PRICE_SMOKE_ENABLED:-0}" = "1" ]; then

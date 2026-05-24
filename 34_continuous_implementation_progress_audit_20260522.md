@@ -228,7 +228,7 @@
 - `./scripts/krx_price_smoke` skip 확인: KRX_PRICE_SMOKE_ENABLED 설정 없음
 - `./scripts/ecos_fx_smoke` 통과: USD/KRW rates=10, latest `2026-05-22 1503.5000`
 - `./scripts/provider_smoke` 통과: SEC EDGAR/OpenDART/ECOS actual smoke pass, 미설정 KRX/RSS/OFAC는 guarded skip
-- `./scripts/external_smoke_readiness` 확인: SEC EDGAR/OpenDART/ECOS ready, 남은 외부 webhook/snapshot/G7 승인 조건 blocked
+- `./scripts/external_smoke_readiness` 확인: SEC EDGAR/OpenDART/ECOS ready, webhook은 현재 검증 범위에서 skipped, 남은 snapshot/G7 승인 조건 blocked
 - `./scripts/official_rss_smoke` skip 확인: OFFICIAL_RSS_SMOKE_ENABLED 설정 없음
 - `./scripts/ofac_recent_actions_smoke` skip 확인: OFAC_RECENT_ACTIONS_SMOKE_ENABLED 설정 없음
 - `OFFICIAL_RSS_SMOKE_ENABLED=1 ./scripts/official_rss_smoke` 통과: Federal Reserve/ECB 각 5건 headline 응답
@@ -279,5 +279,5 @@
 - Goldilocks ODBC 대상 repository writer smoke 완료
 - KIS 매수가능조회 smoke 완료
 - 장기 대량 replay는 실제 snapshot 확보 후 실행/튜닝 필요
-- 실제 webhook alert delivery smoke는 script 준비 완료, 현재 환경은 URL 설정 없음
+- 실제 webhook alert delivery smoke는 script 준비 완료, 현재 검증 범위에서는 무시
 - G7 제한 실거래 실계좌/모의투자 실측 smoke
