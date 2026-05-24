@@ -17,6 +17,7 @@ from silver_platter.api.main import (
     backtest_replay_exported_snapshot,
     backtest_run,
     backtest_strategy_plugins,
+    current_price_history_risk,
     headline_risk_signals,
     HeadlineRiskSignalsRequest,
     audit_setting_change_append,
@@ -111,6 +112,47 @@ class ApiBoundaryTests(TestCase):
         self.assertEqual("005930", payload["security_id"])
         self.assertEqual("1d", payload["risk_range"])
         self.assertEqual(20, len(payload["points"]))
+
+    def test_current_price_history_risk_returns_db_backed_assessment(self):
+        class FakeConnection:
+            def close(self):
+                pass
+
+        class FakeRepository:
+            def __init__(self, connection):
+                self.connection = connection
+
+            def get_price_history_bars(self, market, security_id, bar_interval, limit):
+                base = datetime(2026, 5, 1, 16, 0, 0)
+                return [
+                    PriceBarInput(
+                        security_id=security_id,
+                        bar_ts=base.replace(day=index + 1),
+                        close_price=70000 + index * 300,
+                        volume=1000000 + index,
+                        turnover_krw=70000000000,
+                        available_to_model_at=base.replace(day=index + 1),
+                    )
+                    for index in range(22)
+                ]
+
+        with patch.object(api_main, "connect_goldilocks_from_env", return_value=FakeConnection()), patch.object(
+            api_main,
+            "GoldilocksRepository",
+            FakeRepository,
+        ):
+            payload = current_price_history_risk(
+                "005930",
+                current_price=76500,
+                market="KR",
+                risk_range="1w",
+                limit=20,
+            )
+
+        self.assertEqual("005930", payload["security_id"])
+        self.assertEqual(76500, payload["current_price"])
+        self.assertGreater(payload["risk_score"], 0)
+        self.assertIn("입력 현재가", payload["summary"])
 
     def test_strategy_plugins_endpoint_lists_builtin_plugins(self):
         response = backtest_strategy_plugins()

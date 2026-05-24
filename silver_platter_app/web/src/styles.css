@@ -878,6 +878,60 @@ select {
   min-height: 28px;
 }
 
+.current-price-risk-panel {
+  border-top: 1px solid #edf1f4;
+  display: grid;
+  gap: 10px;
+  margin-top: 14px;
+  padding-top: 12px;
+}
+
+.current-price-risk-heading {
+  align-items: center;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+}
+
+.current-price-risk-heading span,
+.current-price-risk-metrics span {
+  color: #59656e;
+  font-size: 12px;
+}
+
+.current-price-risk-heading strong,
+.current-price-risk-metrics strong {
+  font-size: 13px;
+  overflow-wrap: anywhere;
+  text-align: right;
+}
+
+.current-price-risk-metrics {
+  background: #f6f8f9;
+  border: 1px solid #dce3e8;
+  border-radius: 8px;
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  padding: 10px;
+}
+
+.current-price-risk-metrics div {
+  display: grid;
+  gap: 4px;
+}
+
+.current-price-risk-metrics strong {
+  text-align: left;
+}
+
+.current-price-risk-panel p {
+  color: #33424c;
+  font-size: 12px;
+  line-height: 1.5;
+  margin: 0;
+}
+
 .wide-panel {
   min-height: 160px;
 }
@@ -974,8 +1028,14 @@ select {
   }
 
   .decision-band,
-  .index-strip {
+  .index-strip,
+  .current-price-risk-metrics {
     grid-template-columns: 1fr;
+  }
+
+  .current-price-risk-heading {
+    align-items: flex-start;
+    flex-direction: column;
   }
 
   .range-row {

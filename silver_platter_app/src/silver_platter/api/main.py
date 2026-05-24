@@ -31,7 +31,10 @@ from silver_platter.headlines import (
     detect_geopolitical_market_alert,
 )
 from silver_platter.health import get_health
-from silver_platter.history_risk import build_price_history_risk_chart
+from silver_platter.history_risk import (
+    assess_current_price_risk,
+    build_price_history_risk_chart,
+)
 from silver_platter.ml import FeatureSnapshot, ModelRegistry, predict_many
 from silver_platter.ml_ops import (
     WatchlistRegistry,
@@ -711,6 +714,56 @@ def price_history_risk_chart(
             normalized_security,
             normalized_market,
             bars,
+            selected_range=risk_range,
+            limit=limit,
+        )
+    except ValueError as exc:
+        raise _bad_request(exc) from exc
+
+
+@app.get("/api/history/current-price-risk")
+def current_price_history_risk(
+    security_id: str,
+    current_price: float,
+    market: str = "KR",
+    risk_range: str = "1w",
+    limit: int = 260,
+) -> Dict[str, Any]:
+    if not security_id.strip():
+        raise _bad_request(ValueError("security_id is required"))
+    if current_price <= 0:
+        raise _bad_request(ValueError("current_price must be positive"))
+    if limit <= 0 or limit > 500:
+        raise _bad_request(ValueError("limit must be between 1 and 500"))
+    normalized_market = market.strip().upper()
+    normalized_security = security_id.strip().upper()
+    try:
+        connection = connect_goldilocks_from_env()
+        try:
+            bars = GoldilocksRepository(connection).get_price_history_bars(
+                normalized_market,
+                normalized_security,
+                bar_interval="1d",
+                limit=limit,
+            )
+        finally:
+            close = getattr(connection, "close", None)
+            if close is not None:
+                close()
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    if not bars:
+        raise HTTPException(
+            status_code=404,
+            detail="no stored price history for %s/%s"
+            % (normalized_market, normalized_security),
+        )
+    try:
+        return assess_current_price_risk(
+            normalized_security,
+            normalized_market,
+            bars,
+            current_price,
             selected_range=risk_range,
             limit=limit,
         )

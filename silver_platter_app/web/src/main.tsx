@@ -374,6 +374,30 @@ type PriceHistoryRiskChartResponse = {
   reasoning: string;
 };
 
+type CurrentPriceHistoryRiskResponse = {
+  security_id: string;
+  market: string;
+  risk_range: HistoryRiskRange;
+  bar_interval: string;
+  bar_count: number;
+  current_price: number;
+  reference_price: number | null;
+  latest_bar_ts: string | null;
+  lower_bound: number | null;
+  upper_bound: number | null;
+  deviation_from_reference_pct: number | null;
+  band_position_pct: number | null;
+  band_breach_pct: number | null;
+  reference_risk_score: number | null;
+  reference_risk_status: string;
+  rolling_volatility_pct: number | null;
+  risk_score: number;
+  risk_status: string;
+  summary: string;
+  evidence: string[];
+  reasoning: string;
+};
+
 type DashboardData = {
   health: HealthResponse | null;
   mlJob: MlJobResponse | null;
@@ -391,6 +415,7 @@ type DashboardData = {
   headlineRisk: HeadlineRiskResponse | null;
   volumeLeaders: VolumeLeadersResponse | null;
   historySecurities: PriceHistorySecuritiesResponse | null;
+  currentPriceRisk: CurrentPriceHistoryRiskResponse | null;
   strategyPlugins: StrategyPlugin[];
 };
 
@@ -446,6 +471,7 @@ const EMPTY_DASHBOARD: DashboardData = {
   headlineRisk: null,
   volumeLeaders: null,
   historySecurities: null,
+  currentPriceRisk: null,
   strategyPlugins: [],
 };
 
@@ -958,6 +984,8 @@ async function loadDashboardData(form: OrderForm): Promise<DashboardData> {
   const asOf = new Date().toISOString();
   const securityId = form.securityId.trim() || DEFAULT_ORDER.securityId;
   const basePrice = toNumber(form.price, 0);
+  const encodedSecurityId = encodeURIComponent(securityId);
+  const encodedMarket = encodeURIComponent(form.market);
   const performanceAsOf = new Date(asOf);
   performanceAsOf.setUTCDate(performanceAsOf.getUTCDate() - 70);
   const healthPromise = apiGet<HealthResponse>("/health");
@@ -1014,6 +1042,14 @@ async function loadDashboardData(form: OrderForm): Promise<DashboardData> {
   const historySecuritiesPromise = apiGet<PriceHistorySecuritiesResponse>(
     "/api/history/securities?limit=100",
   ).catch(() => ({ items: [] }));
+  const currentPriceRiskPromise =
+    basePrice > 0
+      ? apiGet<CurrentPriceHistoryRiskResponse>(
+          `/api/history/current-price-risk?security_id=${encodedSecurityId}&market=${encodedMarket}&current_price=${encodeURIComponent(
+            String(basePrice),
+          )}&risk_range=1w&limit=260`,
+        ).catch(() => null)
+      : Promise.resolve(null);
   const backupStatusPromise = apiGet<BackupStatusResponse>("/api/operations/backup-status");
   const strategyPluginsPromise = apiGet<StrategyPluginsResponse>("/api/backtests/strategy-plugins");
   const auditPromise = apiGet<AuditEventsResponse>("/api/audit/events");
@@ -1103,6 +1139,7 @@ async function loadDashboardData(form: OrderForm): Promise<DashboardData> {
     providerCatalog,
     volumeLeaders,
     historySecurities,
+    currentPriceRisk,
     backupStatus,
     strategyPlugins,
     audit,
@@ -1121,6 +1158,7 @@ async function loadDashboardData(form: OrderForm): Promise<DashboardData> {
     providerCatalogPromise,
     volumeLeadersPromise,
     historySecuritiesPromise,
+    currentPriceRiskPromise,
     backupStatusPromise,
     strategyPluginsPromise,
     auditPromise,
@@ -1141,6 +1179,7 @@ async function loadDashboardData(form: OrderForm): Promise<DashboardData> {
     providerCatalog,
     volumeLeaders,
     historySecurities,
+    currentPriceRisk,
     backupStatus,
     strategyPlugins: strategyPlugins.plugins,
     audit,
@@ -1585,6 +1624,7 @@ function App() {
   const priceRanges = preview?.price_ranges ?? [];
   const investmentProjection = preview?.investment_projection ?? null;
   const latestPrediction = data.mlJob?.predictions.find((item) => item.horizon === "1w");
+  const currentPriceRisk = data.currentPriceRisk;
   const modelPerformance = data.mlPerformance?.error_summary;
   const mlIssue =
     data.mlJob && data.mlJob.predictions.length === 0
@@ -2263,6 +2303,46 @@ function App() {
               <dd>{data.mlJob ? formatNumber(data.mlJob.error_summary.mean_absolute_error, 2) : "확인 불가"}</dd>
             </div>
           </dl>
+          <section className="current-price-risk-panel">
+            <div className="current-price-risk-heading">
+              <span>현재가 이력 리스크</span>
+              <strong className={statusTone(currentPriceRisk?.risk_status)}>
+                {currentPriceRisk
+                  ? `${formatNumber(currentPriceRisk.risk_score, 1)} · ${statusLabel(
+                      currentPriceRisk.risk_status,
+                    )}`
+                  : "DB 이력 없음"}
+              </strong>
+            </div>
+            {currentPriceRisk ? (
+              <>
+                <div className="current-price-risk-metrics">
+                  <div>
+                    <span>기준가</span>
+                    <strong>{formatMaybeNumber(currentPriceRisk.reference_price, 2)}</strong>
+                  </div>
+                  <div>
+                    <span>이력 범위</span>
+                    <strong>
+                      {formatMaybeNumber(currentPriceRisk.lower_bound, 2)} -{" "}
+                      {formatMaybeNumber(currentPriceRisk.upper_bound, 2)}
+                    </strong>
+                  </div>
+                  <div>
+                    <span>편차</span>
+                    <strong>
+                      {currentPriceRisk.deviation_from_reference_pct == null
+                        ? "확인 불가"
+                        : formatPct(currentPriceRisk.deviation_from_reference_pct)}
+                    </strong>
+                  </div>
+                </div>
+                <p>{currentPriceRisk.summary}</p>
+              </>
+            ) : (
+              <p>현재 종목의 저장된 과거 가격 데이터가 있으면 입력 현재가의 이력 기반 리스크를 계산합니다.</p>
+            )}
+          </section>
         </article>
 
         <article className="chart-panel">
