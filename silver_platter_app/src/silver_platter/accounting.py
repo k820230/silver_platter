@@ -100,6 +100,16 @@ class PostedExecutionResult:
 
 
 @dataclass(frozen=True)
+class UnrealizedPnl:
+    security_id: str
+    quantity: float
+    cost_basis_krw: float
+    market_value_krw: float
+    unrealized_pnl_krw: float
+    unrealized_return_pct: float
+
+
+@dataclass(frozen=True)
 class ReconciliationInput:
     security_id: str
     broker_quantity: float
@@ -218,6 +228,41 @@ def match_sell_fifo(
 
     total_realized = round(sum(match.realized_pnl_krw for match in matches), 2)
     return matches, total_realized
+
+
+def calculate_unrealized_pnl(
+    lots: Iterable[PositionLot],
+    current_prices_krw: dict,
+) -> List[UnrealizedPnl]:
+    totals: dict = {}
+    for lot in lots:
+        if lot.remaining_quantity <= 0:
+            continue
+        if lot.security_id not in current_prices_krw:
+            continue
+        current_price = float(current_prices_krw[lot.security_id])
+        cost_basis = lot.remaining_quantity * lot.unit_cost_krw
+        market_value = lot.remaining_quantity * current_price
+        quantity, cost, value = totals.get(lot.security_id, (0.0, 0.0, 0.0))
+        totals[lot.security_id] = (
+            quantity + lot.remaining_quantity,
+            cost + cost_basis,
+            value + market_value,
+        )
+    output: List[UnrealizedPnl] = []
+    for security_id, (quantity, cost, value) in sorted(totals.items()):
+        pnl = value - cost
+        output.append(
+            UnrealizedPnl(
+                security_id=security_id,
+                quantity=round(quantity, 8),
+                cost_basis_krw=round(cost, 2),
+                market_value_krw=round(value, 2),
+                unrealized_pnl_krw=round(pnl, 2),
+                unrealized_return_pct=0.0 if cost == 0 else round(pnl / cost, 6),
+            )
+        )
+    return output
 
 
 def post_execution_fifo(

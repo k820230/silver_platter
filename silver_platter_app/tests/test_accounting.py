@@ -1,7 +1,13 @@
 import unittest
 from datetime import date
 
-from silver_platter.accounting import BuyExecution, SellExecution, create_lot, match_sell_fifo
+from silver_platter.accounting import (
+    BuyExecution,
+    SellExecution,
+    calculate_unrealized_pnl,
+    create_lot,
+    match_sell_fifo,
+)
 
 
 class AccountingTest(unittest.TestCase):
@@ -30,6 +36,19 @@ class AccountingTest(unittest.TestCase):
                 SellExecution("s1", "KR-005930", 2, 70_000, date(2026, 3, 1)),
                 [lot],
             )
+
+    def test_calculates_unrealized_pnl_from_remaining_lots(self):
+        lot = create_lot(
+            BuyExecution("b1", "KR-005930", 10, 50_000, date(2026, 1, 1))
+        )
+
+        [pnl] = calculate_unrealized_pnl([lot], {"KR-005930": 55_000})
+
+        self.assertEqual("KR-005930", pnl.security_id)
+        self.assertEqual(500_000, pnl.cost_basis_krw)
+        self.assertEqual(550_000, pnl.market_value_krw)
+        self.assertEqual(50_000, pnl.unrealized_pnl_krw)
+        self.assertEqual(0.1, pnl.unrealized_return_pct)
 
 
 if __name__ == "__main__":

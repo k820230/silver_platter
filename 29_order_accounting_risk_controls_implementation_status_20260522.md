@@ -25,6 +25,7 @@
 - cash ledger entry 생성
 - buy execution -> position lot 생성
 - sell execution -> FIFO lot matching과 realized PnL 계산
+- remaining lot 기준 unrealized PnL 계산
 - broker/internal position/cash reconciliation report
 
 ### 3.2 주문 상태기계와 멱등성
@@ -128,6 +129,7 @@
 
 - buy posting의 transaction/cash/lot 생성
 - sell posting의 FIFO matching과 realized PnL
+- remaining lot unrealized PnL 계산
 - reconciliation mismatch report
 - 정상/비정상 주문 상태 전이
 - broker timeout reconciliation filled 상태 반영
