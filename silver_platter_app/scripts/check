@@ -5,6 +5,7 @@ cd "$(dirname "$0")/.."
 
 ./scripts/lint
 ./scripts/test
+./scripts/scheduler_smoke
 ./scripts/migrate status
 ./scripts/seed_verify
 

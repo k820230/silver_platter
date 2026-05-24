@@ -1,0 +1,42 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+cd "$(dirname "$0")/.."
+
+BACKUP_BASE_DIR="$(mktemp -d)"
+export BACKUP_BASE_DIR
+export APP_TIMEZONE=Asia/Seoul
+export GOLDILOCKS_BACKUP_COMMAND='mkdir -p goldilocks/data && printf smoke > goldilocks/data/part.dat'
+
+cleanup() {
+  rm -rf "${BACKUP_BASE_DIR}"
+}
+trap cleanup EXIT
+
+OUTPUT="$(PYTHONPATH=src python3 -m silver_platter.worker.scheduler)"
+printf '%s\n' "${OUTPUT}" | grep -q "backup_job=SchedulerJobResult"
+printf '%s\n' "${OUTPUT}" | grep -q "restore_drill=SchedulerJobResult"
+
+PYTHONPATH=src python3 - <<'PY'
+import json
+import os
+from pathlib import Path
+
+base = Path(os.environ["BACKUP_BASE_DIR"])
+manifests = sorted(base.glob("*/manifest.json"))
+if len(manifests) != 1:
+    raise SystemExit("expected one backup manifest, found %s" % manifests)
+manifest = manifests[0]
+payload = json.loads(manifest.read_text(encoding="utf-8"))
+if payload.get("status") != "success" or not payload.get("files"):
+    raise SystemExit("unexpected backup manifest payload: %s" % payload)
+
+evidence_files = sorted((base / ".restore_drill_runs").glob("*.json"))
+if len(evidence_files) != 1:
+    raise SystemExit("expected one restore drill evidence file, found %s" % evidence_files)
+evidence = json.loads(evidence_files[0].read_text(encoding="utf-8"))
+if evidence.get("status") != "ok" or evidence.get("manifest_path") != str(manifest):
+    raise SystemExit("unexpected restore drill evidence: %s" % evidence)
+PY
+
+echo "Scheduler smoke checks passed"

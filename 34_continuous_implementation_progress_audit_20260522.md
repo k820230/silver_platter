@@ -156,6 +156,7 @@
 - `./scripts/test`
 - `./scripts/check`
 - `./scripts/smoke_api`
+- `./scripts/scheduler_smoke`
 - `./scripts/migrate plan`
 - `./scripts/migrate apply --dry-run`
 - `./scripts/goldilocks_odbc_smoke` skip 확인: ODBC 설정 없음
