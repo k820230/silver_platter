@@ -52,6 +52,21 @@ class KoreaInvestmentOrderableResult:
     raw: Dict[str, Any]
 
 
+@dataclass(frozen=True)
+class MarketTradingWindow:
+    market: str
+    timezone: str
+    open_time: str
+    close_time: str
+
+
+MARKET_TRADING_WINDOWS: Dict[str, MarketTradingWindow] = {
+    "KR": MarketTradingWindow("KR", "Asia/Seoul", "09:00", "15:30"),
+    "KRX": MarketTradingWindow("KRX", "Asia/Seoul", "09:00", "15:30"),
+    "US": MarketTradingWindow("US", "America/New_York", "09:30", "16:00"),
+}
+
+
 class KoreaInvestmentTransport(Protocol):
     def get(
         self,
@@ -320,3 +335,14 @@ def _to_float(value: object) -> float:
     if value is None or value == "":
         return 0.0
     return float(str(value).replace(",", ""))
+
+
+def is_regular_order_time(market: str, now: datetime) -> bool:
+    normalized_market = market.strip().upper()
+    window = MARKET_TRADING_WINDOWS.get(normalized_market)
+    if window is None:
+        return False
+    if now.weekday() >= 5:
+        return False
+    current = now.strftime("%H:%M")
+    return window.open_time <= current <= window.close_time

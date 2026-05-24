@@ -8,6 +8,7 @@ from silver_platter.broker import (
     KoreaInvestmentCredentials,
     KoreaInvestmentHttpTransport,
     PaperBrokerAdapter,
+    is_regular_order_time,
 )
 from silver_platter.order_service import OrderSubmissionInput, OrderSubmissionService
 
@@ -266,6 +267,14 @@ class BrokerOrderServiceTests(TestCase):
         self.assertEqual("POST", requests[0][0].get_method())
         self.assertEqual("https://example.test/oauth2/tokenP", requests[0][0].full_url)
         self.assertEqual({"appkey": "app"}, json.loads(requests[0][0].data.decode("utf-8")))
+
+    def test_regular_order_time_checks_market_windows(self):
+        from datetime import datetime
+
+        self.assertTrue(is_regular_order_time("KR", datetime(2026, 5, 22, 10, 0, 0)))
+        self.assertFalse(is_regular_order_time("KR", datetime(2026, 5, 22, 16, 0, 0)))
+        self.assertTrue(is_regular_order_time("US", datetime(2026, 5, 22, 10, 0, 0)))
+        self.assertFalse(is_regular_order_time("US", datetime(2026, 5, 23, 10, 0, 0)))
 
     def test_submission_blocks_duplicate_idempotency_key(self):
         service = OrderSubmissionService(PaperBrokerAdapter())

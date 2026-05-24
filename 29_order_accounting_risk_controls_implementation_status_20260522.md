@@ -58,6 +58,7 @@
 - 한국투자증권 OAuth token request mapping
 - 한국투자증권 국내주식 현금주문 payload mapping
 - 한국투자증권 매수가능조회/orderability query mapping
+- KR/US 정규장 주문 가능 시간 helper
 - `scripts/kis_orderable_smoke` read-only smoke
 - live mode에서도 credential/transport 누락 시 broker 전송 전 rejected
 - 국내주식 외 market은 broker 전송 전 rejected
@@ -141,6 +142,7 @@
 - KIS live mode credential/transport guard
 - KIS domestic cash order OAuth/order payload mapping
 - KIS orderability OAuth/query payload mapping
+- KR/US 정규장 주문 가능 시간 판정
 - KIS HTTP transport JSON POST 검증
 - KIS unsupported market pre-send rejection
 - order state/idempotency/audit repository SQL generation

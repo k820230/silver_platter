@@ -148,7 +148,7 @@
 | 부분체결 처리 | [x] |
 | 취소/정정 처리 | [x] |
 | broker timeout reconciliation | [x] |
-| 주문 가능 시간 확인 | [ ] |
+| 주문 가능 시간 확인 | [x] |
 | simulation 주문 broker 미전송 | [x] |
 | paper/live 모드 명확히 분리 | [x] |
 | 주문 이벤트 감사 로그 | [x] |

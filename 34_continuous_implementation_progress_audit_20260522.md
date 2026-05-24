@@ -94,6 +94,7 @@
 - broker timeout reconciliation
 - broker order service
 - KIS guarded OAuth/order/orderability payload mapping
+- KR/US regular order time helper
 - risk controls
 - headline dedup clustering
 - headline cluster to event risk signal mapping
@@ -181,7 +182,7 @@
 - verification status UI card
 - migration coverage
 
-현재 테스트 수: 219개
+현재 테스트 수: 220개
 
 ## 7. 검증 증적
 
