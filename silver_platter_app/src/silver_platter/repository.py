@@ -19,6 +19,7 @@ from silver_platter.headlines import Headline, HeadlineDedupCluster
 from silver_platter.ml_ops import ModelErrorSummary, WatchlistItem
 from silver_platter.order_state import OrderStateEvent
 from silver_platter.providers import ProviderLicensePolicy, ProviderMetadata, SecurityReference
+from silver_platter.risk import RiskDecision
 from silver_platter.risk_controls import EventRiskSignal
 from silver_platter.verification import GateAssessment, GateEvidence
 
@@ -444,6 +445,33 @@ class GoldilocksRepository:
                 order_request_id,
                 reserved_at or datetime.utcnow(),
                 expires_at,
+            ),
+        )
+
+    def insert_risk_check_result(
+        self,
+        order_request_id: Optional[int],
+        decision: RiskDecision,
+        rule_version: str = "mvp-risk-v1",
+        checked_at: Optional[datetime] = None,
+    ) -> None:
+        self._execute(
+            """
+            INSERT INTO SP.risk_check_result (
+                order_request_id,
+                result_status,
+                checked_at,
+                rule_version,
+                detail
+            )
+            VALUES (?, ?, ?, ?, ?)
+            """,
+            (
+                order_request_id,
+                decision.status,
+                checked_at or datetime.utcnow(),
+                rule_version,
+                json.dumps(decision.as_dict(), ensure_ascii=True, sort_keys=True),
             ),
         )
 

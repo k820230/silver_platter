@@ -136,7 +136,7 @@
 | 변동성 지수 산출 | [x] |
 | 위험도 지수 0~100 산출 | [x] |
 | 공시/헤드라인/국제 이벤트 risk signal | [x] |
-| 주문 전 risk_check_result 저장 | [ ] |
+| 주문 전 risk_check_result 저장 | [x] |
 | kill switch 동작 | [x] |
 
 ## 9. 주문/체결 검증 체크리스트

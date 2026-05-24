@@ -26,6 +26,7 @@ from silver_platter.providers import (
     sample_bar,
 )
 from silver_platter.repository import GoldilocksRepository
+from silver_platter.risk import OrderRiskInput, evaluate_order_risk
 from silver_platter.risk_controls import headline_clusters_to_event_risk_signals
 from silver_platter.verification import (
     DEFAULT_GATE_REQUIREMENTS,
@@ -250,6 +251,28 @@ class RepositoryTests(TestCase):
         self.assertEqual((33, "draft", "previewed"), connection.commands[0][1][:3])
         self.assertIn("SP.order_idempotency_key", connection.commands[1][0])
         self.assertEqual(("key-1", 33), connection.commands[1][1][:2])
+
+    def test_insert_risk_check_result(self):
+        decision = evaluate_order_risk(
+            OrderRiskInput(
+                order_amount_krw=2_000_000_000,
+                avg_daily_turnover_20d_krw=10_000_000_000,
+                market="KR",
+                order_type="limit",
+            )
+        )
+        connection = FakeConnection()
+        repository = GoldilocksRepository(connection)
+
+        repository.insert_risk_check_result(
+            33,
+            decision,
+            checked_at=datetime(2026, 5, 22, 9, 0, 0),
+        )
+
+        self.assertIn("SP.risk_check_result", connection.commands[0][0])
+        self.assertEqual((33, "block"), connection.commands[0][1][:2])
+        self.assertIn("AMOUNT_ABOVE_MAX", connection.commands[0][1][4])
 
     def test_insert_backtest_run_and_result_tables(self):
         candidate = StrategyOrderCandidate(

@@ -111,6 +111,7 @@
 
 - `order_state_event` insert
 - `order_idempotency_key` insert
+- `risk_check_result` insert
 - `audit_log` insert
 
 ## 4. 테스트
@@ -137,6 +138,7 @@
 - KIS HTTP transport JSON POST 검증
 - KIS unsupported market pre-send rejection
 - order state/idempotency/audit repository SQL generation
+- risk_check_result repository SQL generation
 - kill switch block
 - event risk warning과 expired signal 무시
 - 통화별 exposure 합산과 weight 계산
