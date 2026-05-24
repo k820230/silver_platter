@@ -10,6 +10,7 @@ import os
 from pathlib import Path
 import subprocess
 import sys
+import urllib.request
 
 from silver_platter.backup import summarize_backup_restore_status
 from silver_platter.verification import DEFAULT_GATE_REQUIREMENTS
@@ -33,6 +34,25 @@ def _combined_output(result):
     return "\n".join(part for part in [result.stdout, result.stderr] if part)
 
 
+def _http_get(url):
+    try:
+        with urllib.request.urlopen(url, timeout=10) as response:
+            body = response.read(200).decode("utf-8", errors="replace")
+        return subprocess.CompletedProcess(
+            ["GET", url],
+            0,
+            "status=%s body=%s" % (getattr(response, "status", "ok"), body),
+            "",
+        )
+    except Exception as exc:
+        return subprocess.CompletedProcess(
+            ["GET", url],
+            1,
+            "",
+            "%s: %s" % (exc.__class__.__name__, exc),
+        )
+
+
 def main(argv):
     parser = argparse.ArgumentParser(
         description="Collect local verification outputs into a gate evidence bundle."
@@ -45,9 +65,11 @@ def main(argv):
         ),
     )
     parser.add_argument("--skip-check", action="store_true")
+    parser.add_argument("--skip-web", action="store_true")
     parser.add_argument("--run-smoke-api", action="store_true")
     parser.add_argument("--no-backup", action="store_true")
     parser.add_argument("--write-goldilocks", action="store_true")
+    parser.add_argument("--web-url", default=os.getenv("WEB_URL", "http://localhost:3000"))
     parser.add_argument(
         "--backup-base-dir",
         default=os.getenv("BACKUP_BASE_DIR", "/home/jhkim5/backup_sp"),
@@ -71,6 +93,20 @@ def main(argv):
             script_result_to_gate_evidence(
                 "compose_config",
                 "scripts/check",
+                result.returncode,
+                checked_at,
+                _combined_output(result),
+            )
+        )
+        gate_ids.append("G2")
+        command_failed = command_failed or result.returncode != 0
+
+    if not args.skip_web:
+        result = _http_get(args.web_url)
+        evidence.append(
+            script_result_to_gate_evidence(
+                "web_health",
+                "GET %s" % args.web_url,
                 result.returncode,
                 checked_at,
                 _combined_output(result),

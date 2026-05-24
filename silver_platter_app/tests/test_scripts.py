@@ -275,3 +275,32 @@ class ScriptHelperTests(TestCase):
             self.assertIn('"gate_id": "G7"', payload)
             self.assertIn('"status": "pass"', payload)
             self.assertIn("approval_flag=G7_LIVE_SMOKE_APPROVED remains manual", result.stdout)
+
+    def test_collect_verification_evidence_records_web_health(self):
+        script = Path(__file__).resolve().parents[1] / "scripts" / "collect_verification_evidence"
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            web_index = root / "index.html"
+            web_index.write_text("<html>ok</html>", encoding="utf-8")
+            output = root / "evidence.json"
+
+            subprocess.run(
+                [
+                    str(script),
+                    "--skip-check",
+                    "--no-backup",
+                    "--web-url",
+                    web_index.as_uri(),
+                    "--output",
+                    str(output),
+                ],
+                cwd=Path(__file__).resolve().parents[1],
+                env={**os.environ, "PYTHONPATH": "src"},
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+
+            payload = output.read_text(encoding="utf-8")
+            self.assertIn('"requirement_id": "web_health"', payload)
+            self.assertIn('"status": "pass"', payload)
