@@ -2,15 +2,23 @@
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
+
+requested_enabled="${KRX_PRICE_SMOKE_ENABLED:-}"
+requested_symbol="${KRX_PRICE_SMOKE_SYMBOL:-}"
+requested_trade_date="${KRX_PRICE_SMOKE_DATE:-}"
 . scripts/load_local_env
 
-if [ "${KRX_PRICE_SMOKE_ENABLED:-0}" != "1" ]; then
+KRX_PRICE_SMOKE_ENABLED="${requested_enabled:-${KRX_PRICE_SMOKE_ENABLED:-0}}"
+KRX_PRICE_SMOKE_SYMBOL="${requested_symbol:-${KRX_PRICE_SMOKE_SYMBOL:-005930}}"
+KRX_PRICE_SMOKE_DATE="${requested_trade_date:-${KRX_PRICE_SMOKE_DATE:-}}"
+
+if [ "${KRX_PRICE_SMOKE_ENABLED}" != "1" ]; then
   echo "KRX price smoke skipped: set KRX_PRICE_SMOKE_ENABLED=1 to run read-only network check"
   exit 0
 fi
 
-SYMBOL="${KRX_PRICE_SMOKE_SYMBOL:-005930}"
-TRADE_DATE="${KRX_PRICE_SMOKE_DATE:-}"
+SYMBOL="${KRX_PRICE_SMOKE_SYMBOL}"
+TRADE_DATE="${KRX_PRICE_SMOKE_DATE}"
 
 PYTHONPATH=src python3 - <<PY
 from datetime import date

@@ -14,6 +14,15 @@ class ScriptHelperTests(TestCase):
         for name in ["external_smoke_readiness", "load_local_env"]:
             shutil.copyfile(source_root / "scripts" / name, scripts_dir / name)
 
+    def _copy_scripts(self, root: Path, names: list) -> None:
+        source_root = Path(__file__).resolve().parents[1]
+        scripts_dir = root / "scripts"
+        scripts_dir.mkdir(exist_ok=True)
+        for name in names:
+            target = scripts_dir / name
+            shutil.copyfile(source_root / "scripts" / name, target)
+            target.chmod(0o755)
+
     def _script_env(self) -> dict:
         return {"PATH": os.environ.get("PATH", "/usr/bin:/bin")}
 
@@ -183,3 +192,20 @@ class ScriptHelperTests(TestCase):
             self.assertIn('"loaded_bar_count": 101', replay.stdout)
             self.assertIn('"status": "completed"', replay.stdout)
             self.assertIn('"status": "pass"', replay.stdout)
+
+    def test_krx_price_smoke_preserves_explicit_disabled_env(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self._copy_scripts(root, ["krx_price_smoke", "load_local_env"])
+            (root / ".env").write_text("KRX_PRICE_SMOKE_ENABLED=1\n", encoding="utf-8")
+
+            result = subprocess.run(
+                ["bash", "scripts/krx_price_smoke"],
+                cwd=root,
+                env={**self._script_env(), "KRX_PRICE_SMOKE_ENABLED": "0"},
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertIn("KRX price smoke skipped", result.stdout)
