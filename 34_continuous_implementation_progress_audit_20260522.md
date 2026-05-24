@@ -222,6 +222,8 @@
 - `GOLDILOCKS_REPOSITORY_SMOKE_WRITE=1 ./scripts/goldilocks_repository_smoke` 통과: provider/license/audit/scenario/restore/headline writer rollback 확인
 - `./scripts/collect_verification_evidence --skip-check --run-smoke-api --no-backup --write-goldilocks --output var/verification/evidence-bundle-goldilocks-smoke.json` 통과: G2 assessment/evidence Goldilocks persistence path 확인
 - `./scripts/kis_orderable_smoke` 통과: `005930` 매수가능조회 응답 확인
+- KIS 국내 일봉 provider 추가: `/uapi/domestic-stock/v1/quotations/inquire-daily-itemchartprice` 응답을 `PriceBarInput`으로 정규화
+- 신규 검색/watchlist 종목 history prefetch 추가: Goldilocks provider/security id 보장 후 `SP.price_bar`에 idempotent 저장
 - `./scripts/sec_edgar_smoke` 통과: 실제 contact User-Agent 환경에서 AAPL disclosure_count=149, latest `0000320193-26-000013`
 - `./scripts/opendart_smoke` 통과: 실제 API key 환경에서 disclosure_count=100 응답 확인
 - `./scripts/krx_kind_smoke` skip 확인: KRX_KIND_SMOKE_ENABLED 설정 없음

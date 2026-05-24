@@ -1,0 +1,50 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+cd "$(dirname "$0")/.."
+. scripts/load_local_env
+
+if [ "${HISTORY_PREFETCH_SMOKE_ENABLED:-0}" != "1" ]; then
+  echo "History prefetch smoke skipped: set HISTORY_PREFETCH_SMOKE_ENABLED=1 to run DB-backed KIS history prefetch"
+  exit 0
+fi
+
+PYTHONPATH=src python3 - <<'PY'
+import os
+from datetime import date, timedelta
+
+from silver_platter.api.main import _prefetch_history_for_security
+
+symbol = os.getenv("HISTORY_PREFETCH_SMOKE_SYMBOL", "005930")
+market = os.getenv("HISTORY_PREFETCH_SMOKE_MARKET", "KR")
+end_date = date.fromisoformat(
+    os.getenv("HISTORY_PREFETCH_SMOKE_END_DATE", date.today().isoformat())
+)
+start_date = date.fromisoformat(
+    os.getenv(
+        "HISTORY_PREFETCH_SMOKE_START_DATE",
+        (end_date - timedelta(days=30)).isoformat(),
+    )
+)
+
+result = _prefetch_history_for_security(
+    symbol,
+    market,
+    start_date,
+    end_date,
+    enabled=True,
+)
+if result["status"] not in {"stored", "skipped_existing_history"}:
+    raise SystemExit("History prefetch smoke failed: %s" % result)
+
+print(
+    "History prefetch smoke passed: security_id=%s provider=%s status=%s bars=%s existing=%s"
+    % (
+        result["security_id"],
+        result["provider_code"],
+        result["status"],
+        result["bar_count"],
+        result["existing_bar_count"],
+    )
+)
+PY

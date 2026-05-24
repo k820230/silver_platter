@@ -60,6 +60,9 @@
   - USD/KRW, JPY/KRW, EUR/KRW 기본 item code mapping
   - ECOS `TIME`, `DATA_VALUE` row normalization
 - `scripts/ecos_fx_smoke` read-only network smoke, `ECOS_API_KEY` 미설정 시 기본 skip
+- KIS 국내 일봉 주식 정보 API 기반 신규 종목 history prefetch
+  - `POST /api/securities/search`와 신규 watchlist 추가 시 Goldilocks `SP.price_bar` 저장 경로 사용
+  - `scripts/history_prefetch_smoke` opt-in DB-backed smoke
 - `scripts/provider_smoke` guarded provider smoke suite
 
 MVP catalog에는 다음 source가 포함된다.
