@@ -206,16 +206,28 @@ type HeadlineRiskSignal = {
   event_id: string;
   event_type: string;
   severity: string;
+  observed_at: string;
   security_ids: string[];
   group_ids: string[];
+  expires_at: string | null;
+};
+
+type HeadlineRiskCluster = {
+  cluster_id: string;
+  representative: {
+    provider: string;
+    title: string;
+    published_at: string;
+    url: string;
+    event_tags: string[];
+  };
+  provider_count: number;
+  source_urls: string[];
+  headline_count: number;
 };
 
 type HeadlineRiskResponse = {
-  clusters: {
-    cluster_id: string;
-    provider_count: number;
-    headline_count: number;
-  }[];
+  clusters: HeadlineRiskCluster[];
   signals: HeadlineRiskSignal[];
 };
 
@@ -280,6 +292,53 @@ type VolumeLeadersResponse = {
   markets: VolumeLeaderMarket[];
 };
 
+type PriceHistorySecurity = {
+  security_db_id: number;
+  security_id: string;
+  security_name: string;
+  market: string;
+  exchange_code: string;
+  provider_code: string;
+  provider_name: string;
+  bar_interval: string;
+  bar_count: number;
+  first_bar_ts: string;
+  latest_bar_ts: string;
+};
+
+type PriceHistorySecuritiesResponse = {
+  items: PriceHistorySecurity[];
+};
+
+type PriceHistoryRiskPoint = {
+  bar_ts: string;
+  close_price: number;
+  volume: number | null;
+  return_pct: number | null;
+  rolling_volatility_pct: number;
+  volume_ratio: number | null;
+  lower_bound: number;
+  upper_bound: number;
+  risk_score: number;
+  risk_status: string;
+};
+
+type PriceHistoryRiskChartResponse = {
+  security_id: string;
+  market: string;
+  risk_range: HistoryRiskRange;
+  bar_interval: string;
+  point_count: number;
+  current_price: number | null;
+  current_volume: number | null;
+  latest_bar_ts: string | null;
+  latest_risk: PriceHistoryRiskPoint | null;
+  points: PriceHistoryRiskPoint[];
+  summary: string;
+  evidence: string[];
+  reasoning: string;
+};
+
 type DashboardData = {
   health: HealthResponse | null;
   mlJob: MlJobResponse | null;
@@ -296,6 +355,7 @@ type DashboardData = {
   backtest: BacktestResponse | null;
   headlineRisk: HeadlineRiskResponse | null;
   volumeLeaders: VolumeLeadersResponse | null;
+  historySecurities: PriceHistorySecuritiesResponse | null;
   strategyPlugins: StrategyPlugin[];
 };
 
@@ -329,6 +389,9 @@ const DEFAULT_ORDER: OrderForm = {
 const DASHBOARD_POLL_INTERVAL_MS = 60_000;
 const RECENT_PREVIEW_SECURITIES_KEY = "silver-platter:recent-preview-securities";
 const RECENT_PREVIEW_SECURITIES_LIMIT = 20;
+const HISTORY_RISK_RANGES = ["1w", "1d", "1h", "5m"] as const;
+type HistoryRiskRange = (typeof HISTORY_RISK_RANGES)[number];
+type AppTab = "dashboard" | "history-risk";
 
 const EMPTY_DASHBOARD: DashboardData = {
   health: null,
@@ -346,6 +409,7 @@ const EMPTY_DASHBOARD: DashboardData = {
   backtest: null,
   headlineRisk: null,
   volumeLeaders: null,
+  historySecurities: null,
   strategyPlugins: [],
 };
 
@@ -390,6 +454,10 @@ function formatCompactNumber(value: number): string {
     maximumFractionDigits: 1,
     notation: "compact",
   }).format(value);
+}
+
+function formatMaybeNumber(value: number | null | undefined, digits = 0): string {
+  return value == null ? "Unknown" : formatNumber(value, digits);
 }
 
 function formatPct(value: number): string {
@@ -471,6 +539,22 @@ function statusTone(value: string | undefined): string {
     return "watch";
   }
   return "neutral";
+}
+
+function rangeLabel(value: HistoryRiskRange): string {
+  return value.toUpperCase();
+}
+
+function formatTimestamp(value: string | null | undefined): string {
+  if (!value) {
+    return "Unknown";
+  }
+  return new Date(value).toLocaleString("ko-KR", {
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 }
 
 function historyPrefetchLabel(result: HistoryPrefetchResult | null, state: RequestState): string {
@@ -682,6 +766,9 @@ async function loadDashboardData(form: OrderForm): Promise<DashboardData> {
   const volumeLeadersPromise = apiGet<VolumeLeadersResponse>(
     "/api/markets/volume-leaders?limit=20",
   );
+  const historySecuritiesPromise = apiGet<PriceHistorySecuritiesResponse>(
+    "/api/history/securities?limit=100",
+  ).catch(() => ({ items: [] }));
   const backupStatusPromise = apiGet<BackupStatusResponse>("/api/operations/backup-status");
   const strategyPluginsPromise = apiGet<StrategyPluginsResponse>("/api/backtests/strategy-plugins");
   const auditPromise = apiGet<AuditEventsResponse>("/api/audit/events");
@@ -770,6 +857,7 @@ async function loadDashboardData(form: OrderForm): Promise<DashboardData> {
     providerHealth,
     providerCatalog,
     volumeLeaders,
+    historySecurities,
     backupStatus,
     strategyPlugins,
     audit,
@@ -787,6 +875,7 @@ async function loadDashboardData(form: OrderForm): Promise<DashboardData> {
     providerHealthPromise,
     providerCatalogPromise,
     volumeLeadersPromise,
+    historySecuritiesPromise,
     backupStatusPromise,
     strategyPluginsPromise,
     auditPromise,
@@ -806,6 +895,7 @@ async function loadDashboardData(form: OrderForm): Promise<DashboardData> {
     providerHealth,
     providerCatalog,
     volumeLeaders,
+    historySecurities,
     backupStatus,
     strategyPlugins: strategyPlugins.plugins,
     audit,
@@ -816,18 +906,274 @@ async function loadDashboardData(form: OrderForm): Promise<DashboardData> {
   };
 }
 
+type GeoRiskEvent = {
+  eventId: string;
+  observedAt: string;
+  severity: string;
+  title: string;
+  provider: string;
+  providerCount: number;
+  headlineCount: number;
+  eventTags: string[];
+  sourceUrls: string[];
+  pointIndex: number;
+};
+
+function scaleValue(value: number, min: number, max: number, low: number, high: number): number {
+  if (max <= min) {
+    return (low + high) / 2;
+  }
+  return low + ((value - min) / (max - min)) * (high - low);
+}
+
+function svgPath(points: { x: number; y: number }[]): string {
+  return points
+    .map((point, index) => `${index === 0 ? "M" : "L"}${point.x.toFixed(2)} ${point.y.toFixed(2)}`)
+    .join(" ");
+}
+
+function closestPointIndex(points: PriceHistoryRiskPoint[], timestamp: string): number {
+  if (!points.length) {
+    return 0;
+  }
+  const target = new Date(timestamp).getTime();
+  let bestIndex = 0;
+  let bestDistance = Number.POSITIVE_INFINITY;
+  points.forEach((point, index) => {
+    const distance = Math.abs(new Date(point.bar_ts).getTime() - target);
+    if (distance < bestDistance) {
+      bestDistance = distance;
+      bestIndex = index;
+    }
+  });
+  return bestIndex;
+}
+
+function riskColor(status: string): string {
+  const normalized = status.toLowerCase();
+  if (normalized === "critical" || normalized === "block") {
+    return "#b85b3f";
+  }
+  if (normalized === "watch" || normalized === "warning") {
+    return "#b58a28";
+  }
+  return "#39705f";
+}
+
+function buildGeoRiskEvents(
+  headlineRisk: HeadlineRiskResponse | null,
+  chart: PriceHistoryRiskChartResponse | null,
+): GeoRiskEvent[] {
+  if (!headlineRisk || !chart) {
+    return [];
+  }
+  const clusters = new Map(
+    headlineRisk.clusters.map((cluster) => [cluster.cluster_id, cluster]),
+  );
+  return headlineRisk.signals
+    .map((signal) => {
+      const cluster = clusters.get(signal.event_id);
+      const representative = cluster?.representative;
+      return {
+        eventId: signal.event_id,
+        observedAt: signal.observed_at,
+        severity: signal.severity,
+        title: representative?.title ?? statusLabel(signal.event_type),
+        provider: representative?.provider ?? "headline",
+        providerCount: cluster?.provider_count ?? 1,
+        headlineCount: cluster?.headline_count ?? 1,
+        eventTags: representative?.event_tags ?? [signal.event_type],
+        sourceUrls: cluster?.source_urls ?? [],
+        pointIndex: closestPointIndex(chart.points, signal.observed_at),
+      };
+    })
+    .sort((left, right) => left.pointIndex - right.pointIndex);
+}
+
+function PriceRiskChart({
+  chart,
+}: {
+  chart: PriceHistoryRiskChartResponse | null;
+}) {
+  if (!chart || !chart.points.length) {
+    return <div className="empty-row">No stored history selected</div>;
+  }
+
+  const width = 720;
+  const height = 320;
+  const left = 54;
+  const right = 26;
+  const top = 22;
+  const priceBottom = 218;
+  const volumeTop = 242;
+  const volumeBottom = 292;
+  const xAt = (index: number) =>
+    scaleValue(index, 0, Math.max(1, chart.points.length - 1), left, width - right);
+  const priceValues = chart.points.flatMap((point) => [
+    point.close_price,
+    point.lower_bound,
+    point.upper_bound,
+  ]);
+  const priceMin = Math.min(...priceValues);
+  const priceMax = Math.max(...priceValues);
+  const pricePadding = Math.max(1, (priceMax - priceMin) * 0.08);
+  const yAt = (value: number) =>
+    scaleValue(value, priceMin - pricePadding, priceMax + pricePadding, priceBottom, top);
+  const maxVolume = Math.max(
+    1,
+    ...chart.points.map((point) => point.volume ?? 0),
+  );
+  const upperPoints = chart.points.map((point, index) => ({
+    x: xAt(index),
+    y: yAt(point.upper_bound),
+  }));
+  const lowerPoints = chart.points.map((point, index) => ({
+    x: xAt(index),
+    y: yAt(point.lower_bound),
+  }));
+  const pricePoints = chart.points.map((point, index) => ({
+    x: xAt(index),
+    y: yAt(point.close_price),
+  }));
+  const bandPath = `${svgPath(upperPoints)} ${svgPath([...lowerPoints].reverse()).replace(/^M/, "L")} Z`;
+  const latest = chart.latest_risk;
+  const latestIndex = chart.points.length - 1;
+
+  return (
+    <svg className="risk-svg" role="img" aria-label="Price risk chart" viewBox={`0 0 ${width} ${height}`}>
+      <rect x="0" y="0" width={width} height={height} rx="8" />
+      <line x1={left} y1={priceBottom} x2={width - right} y2={priceBottom} className="axis-line" />
+      <line x1={left} y1={volumeBottom} x2={width - right} y2={volumeBottom} className="axis-line" />
+      <path d={bandPath} className="risk-band" />
+      <path d={svgPath(upperPoints)} className="risk-bound upper" />
+      <path d={svgPath(lowerPoints)} className="risk-bound lower" />
+      {chart.points.map((point, index) => {
+        const x = xAt(index);
+        const volumeHeight = ((point.volume ?? 0) / maxVolume) * (volumeBottom - volumeTop);
+        return (
+          <rect
+            className="volume-bar"
+            height={volumeHeight}
+            key={`volume-${point.bar_ts}`}
+            width={Math.max(2, (width - left - right) / chart.points.length - 2)}
+            x={x - 2}
+            y={volumeBottom - volumeHeight}
+          />
+        );
+      })}
+      <path d={svgPath(pricePoints)} className="price-line" />
+      {chart.points.map((point, index) => (
+        <circle
+          className="risk-point"
+          cx={xAt(index)}
+          cy={yAt(point.close_price)}
+          fill={riskColor(point.risk_status)}
+          key={`risk-${point.bar_ts}`}
+          r={index === latestIndex ? 4 : 2.6}
+        />
+      ))}
+      {latest ? (
+        <line
+          className="current-price-line"
+          x1={left}
+          x2={width - right}
+          y1={yAt(latest.close_price)}
+          y2={yAt(latest.close_price)}
+        />
+      ) : null}
+      <text className="axis-label" x={left} y={16}>
+        {formatMaybeNumber(priceMax, 0)}
+      </text>
+      <text className="axis-label" x={left} y={priceBottom + 16}>
+        {formatMaybeNumber(priceMin, 0)}
+      </text>
+      <text className="axis-label" x={left} y={height - 12}>
+        {formatTimestamp(chart.points[0]?.bar_ts)}
+      </text>
+      <text className="axis-label end" x={width - right} y={height - 12}>
+        {formatTimestamp(chart.latest_bar_ts)}
+      </text>
+    </svg>
+  );
+}
+
+function GeopoliticalRiskChart({
+  chart,
+  events,
+}: {
+  chart: PriceHistoryRiskChartResponse | null;
+  events: GeoRiskEvent[];
+}) {
+  if (!chart || !chart.points.length) {
+    return <div className="empty-row">No stored history selected</div>;
+  }
+
+  const width = 720;
+  const height = 260;
+  const left = 54;
+  const right = 26;
+  const top = 24;
+  const bottom = 214;
+  const xAt = (index: number) =>
+    scaleValue(index, 0, Math.max(1, chart.points.length - 1), left, width - right);
+  const eventByIndex = new Map<number, number>();
+  events.forEach((event) => {
+    const score = event.severity === "critical" ? 90 : event.severity === "warning" ? 58 : 34;
+    eventByIndex.set(event.pointIndex, Math.max(eventByIndex.get(event.pointIndex) ?? 16, score));
+  });
+  const riskPoints = chart.points.map((_, index) => ({
+    x: xAt(index),
+    y: scaleValue(eventByIndex.get(index) ?? 16, 0, 100, bottom, top),
+  }));
+
+  return (
+    <svg className="risk-svg geo" role="img" aria-label="Geopolitical risk chart" viewBox={`0 0 ${width} ${height}`}>
+      <rect x="0" y="0" width={width} height={height} rx="8" />
+      <line x1={left} y1={bottom} x2={width - right} y2={bottom} className="axis-line" />
+      <line x1={left} y1={scaleValue(70, 0, 100, bottom, top)} x2={width - right} y2={scaleValue(70, 0, 100, bottom, top)} className="risk-threshold" />
+      <path d={svgPath(riskPoints)} className="geo-line" />
+      {events.map((event) => {
+        const x = xAt(event.pointIndex);
+        const y = scaleValue(event.severity === "critical" ? 90 : 58, 0, 100, bottom, top);
+        return (
+          <g key={event.eventId}>
+            <line className="event-marker-line" x1={x} x2={x} y1={top} y2={bottom} />
+            <circle className={`event-marker ${event.severity}`} cx={x} cy={y} r="6" />
+          </g>
+        );
+      })}
+      <text className="axis-label" x={left} y={16}>
+        Risk 100
+      </text>
+      <text className="axis-label" x={left} y={height - 12}>
+        {formatTimestamp(chart.points[0]?.bar_ts)}
+      </text>
+      <text className="axis-label end" x={width - right} y={height - 12}>
+        {formatTimestamp(chart.latest_bar_ts)}
+      </text>
+    </svg>
+  );
+}
+
 function App() {
+  const [activeTab, setActiveTab] = useState<AppTab>("dashboard");
   const [form, setForm] = useState<OrderForm>(DEFAULT_ORDER);
   const [data, setData] = useState<DashboardData>(EMPTY_DASHBOARD);
   const [preview, setPreview] = useState<OrderPreviewResponse | null>(null);
   const [submission, setSubmission] = useState<OrderSubmitResponse | null>(null);
   const [historyPrefetch, setHistoryPrefetch] = useState<HistoryPrefetchResult | null>(null);
+  const [historyRiskRange, setHistoryRiskRange] = useState<HistoryRiskRange>("1w");
+  const [selectedHistorySecurity, setSelectedHistorySecurity] =
+    useState<PriceHistorySecurity | null>(null);
+  const [historyRiskChart, setHistoryRiskChart] =
+    useState<PriceHistoryRiskChartResponse | null>(null);
   const [recentPreviewSecurities, setRecentPreviewSecurities] = useState<
     RecentPreviewSecurity[]
   >(() => loadRecentPreviewSecurities());
   const [state, setState] = useState<RequestState>("idle");
   const [actionState, setActionState] = useState<RequestState>("idle");
   const [historyState, setHistoryState] = useState<RequestState>("idle");
+  const [historyRiskState, setHistoryRiskState] = useState<RequestState>("idle");
   const [error, setError] = useState<string>("");
 
   const refresh = useCallback(async (nextForm: OrderForm = form) => {
@@ -862,6 +1208,54 @@ function App() {
     }, DASHBOARD_POLL_INTERVAL_MS);
     return () => window.clearInterval(intervalId);
   }, [refresh]);
+
+  useEffect(() => {
+    const firstSecurity = data.historySecurities?.items[0] ?? null;
+    if (!selectedHistorySecurity && firstSecurity) {
+      setSelectedHistorySecurity(firstSecurity);
+    }
+  }, [data.historySecurities, selectedHistorySecurity]);
+
+  const loadHistoryRiskChart = useCallback(
+    async (security: PriceHistorySecurity, range: HistoryRiskRange) => {
+      setHistoryRiskState("loading");
+      try {
+        const chart = await apiGet<PriceHistoryRiskChartResponse>(
+          `/api/history/risk-chart?security_id=${encodeURIComponent(
+            security.security_id,
+          )}&market=${encodeURIComponent(security.market)}&risk_range=${range}&limit=160`,
+        );
+        setHistoryRiskChart(chart);
+        setHistoryRiskState("ready");
+      } catch (exc) {
+        setHistoryRiskChart(null);
+        setHistoryRiskState("error");
+      }
+    },
+    [],
+  );
+
+  useEffect(() => {
+    if (selectedHistorySecurity) {
+      void loadHistoryRiskChart(selectedHistorySecurity, historyRiskRange);
+    }
+  }, [
+    historyRiskRange,
+    loadHistoryRiskChart,
+    selectedHistorySecurity?.market,
+    selectedHistorySecurity?.security_id,
+  ]);
+
+  const selectHistorySecurity = (security: PriceHistorySecurity) => {
+    const nextForm = {
+      ...form,
+      securityId: security.security_id,
+      market: security.market,
+    };
+    setSelectedHistorySecurity(security);
+    setForm(nextForm);
+    void refresh(nextForm);
+  };
 
   const submitPaperOrder = async () => {
     setActionState("loading");
@@ -988,6 +1382,9 @@ function App() {
         : data.operations?.status;
   const gateStatus = data.gate?.status;
   const volumeMarkets = data.volumeLeaders?.markets ?? [];
+  const historySecurities = data.historySecurities?.items ?? [];
+  const geoRiskEvents = buildGeoRiskEvents(data.headlineRisk, historyRiskChart);
+  const latestHistoryRisk = historyRiskChart?.latest_risk ?? null;
 
   return (
     <main className="app-shell">
@@ -1088,6 +1485,23 @@ function App() {
         </article>
       </section>
 
+      <nav className="app-tabs" aria-label="Dashboard views">
+        <button
+          type="button"
+          className={activeTab === "dashboard" ? "active" : ""}
+          onClick={() => setActiveTab("dashboard")}
+        >
+          Dashboard
+        </button>
+        <button
+          type="button"
+          className={activeTab === "history-risk" ? "active" : ""}
+          onClick={() => setActiveTab("history-risk")}
+        >
+          History Risk
+        </button>
+      </nav>
+
       <section className="metric-grid" aria-label="Status metrics">
         <article className={`metric-card ${statusTone(riskStatus)}`}>
           <ShieldCheck size={18} />
@@ -1128,6 +1542,149 @@ function App() {
         </article>
       </section>
 
+      {activeTab === "history-risk" ? (
+        <section className="history-risk-workspace">
+          <aside className="history-selector-panel">
+            <header>
+              <h2>DB History</h2>
+              <span>{historySecurities.length}</span>
+            </header>
+            <div className="history-security-list">
+              {historySecurities.length ? (
+                historySecurities.map((security) => (
+                  <button
+                    type="button"
+                    className={
+                      selectedHistorySecurity?.market === security.market &&
+                      selectedHistorySecurity?.security_id === security.security_id
+                        ? "history-security-button active"
+                        : "history-security-button"
+                    }
+                    key={`${security.market}-${security.security_id}-${security.provider_code}`}
+                    onClick={() => selectHistorySecurity(security)}
+                  >
+                    <strong>{security.security_id}</strong>
+                    <span>{security.market}</span>
+                    <em>{security.security_name}</em>
+                    <small>{security.bar_count.toLocaleString("en-US")} bars</small>
+                  </button>
+                ))
+              ) : (
+                <p>No stored DB history</p>
+              )}
+            </div>
+          </aside>
+
+          <section className="history-graph-stack">
+            <article className="risk-chart-card">
+              <header>
+                <div>
+                  <h2>Price Risk</h2>
+                  <span>
+                    {selectedHistorySecurity
+                      ? `${selectedHistorySecurity.market}/${selectedHistorySecurity.security_id}`
+                      : "No selection"}
+                  </span>
+                </div>
+                <div className="range-toggle" role="group" aria-label="Risk range">
+                  {HISTORY_RISK_RANGES.map((range) => (
+                    <button
+                      type="button"
+                      className={historyRiskRange === range ? "active" : ""}
+                      key={range}
+                      onClick={() => setHistoryRiskRange(range)}
+                    >
+                      {rangeLabel(range)}
+                    </button>
+                  ))}
+                </div>
+              </header>
+
+              <div className="history-risk-stats">
+                <span>Current</span>
+                <strong>{formatMaybeNumber(historyRiskChart?.current_price, 2)}</strong>
+                <span>Volume</span>
+                <strong>{formatMaybeNumber(historyRiskChart?.current_volume, 0)}</strong>
+                <span>Risk</span>
+                <strong className={statusTone(latestHistoryRisk?.risk_status)}>
+                  {latestHistoryRisk
+                    ? `${statusLabel(latestHistoryRisk.risk_status)} ${formatNumber(
+                        latestHistoryRisk.risk_score,
+                        1,
+                      )}`
+                    : statusLabel(historyRiskState)}
+                </strong>
+                <span>Latest</span>
+                <strong>{formatTimestamp(historyRiskChart?.latest_bar_ts)}</strong>
+              </div>
+
+              <PriceRiskChart chart={historyRiskChart} />
+
+              <section className="risk-analysis">
+                <header>
+                  <strong>Risk Summary</strong>
+                  <span>{statusLabel(historyRiskState)}</span>
+                </header>
+                <p>{historyRiskChart?.summary ?? "Stored history risk is not loaded."}</p>
+                <div className="evidence-grid">
+                  <div>
+                    <strong>Evidence</strong>
+                    <ul>
+                      {(historyRiskChart?.evidence ?? ["No evidence loaded."]).map((item) => (
+                        <li key={item}>{item}</li>
+                      ))}
+                    </ul>
+                  </div>
+                  <div>
+                    <strong>Reasoning</strong>
+                    <p>{historyRiskChart?.reasoning ?? "No reasoning loaded."}</p>
+                  </div>
+                </div>
+              </section>
+            </article>
+
+            <article className="risk-chart-card">
+              <header>
+                <div>
+                  <h2>Geopolitical Risk</h2>
+                  <span>{rangeLabel(historyRiskRange)} aligned</span>
+                </div>
+                <AlertTriangle size={18} />
+              </header>
+
+              <GeopoliticalRiskChart chart={historyRiskChart} events={geoRiskEvents} />
+
+              <section className="geo-event-panel">
+                <header>
+                  <strong>Event Details</strong>
+                  <span>{geoRiskEvents.length}</span>
+                </header>
+                <div className="geo-event-list">
+                  {geoRiskEvents.length ? (
+                    geoRiskEvents.map((event) => (
+                      <article className="geo-event-row" key={event.eventId}>
+                        <div>
+                          <strong>{event.title}</strong>
+                          <span>
+                            {event.provider} | {formatTimestamp(event.observedAt)} |{" "}
+                            {statusLabel(event.severity)}
+                          </span>
+                        </div>
+                        <p>
+                          {event.providerCount} providers and {event.headlineCount} headlines
+                          matched {event.eventTags.join(", ")} risk themes.
+                        </p>
+                      </article>
+                    ))
+                  ) : (
+                    <p>No geopolitical events in the selected range</p>
+                  )}
+                </div>
+              </section>
+            </article>
+          </section>
+        </section>
+      ) : (
       <section className="workbench">
         <article className="order-ticket">
           <header>
@@ -1560,6 +2117,7 @@ function App() {
           </div>
         </article>
       </section>
+      )}
     </main>
   );
 }

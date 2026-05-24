@@ -229,6 +229,33 @@ button:disabled {
   gap: 3px;
 }
 
+.app-tabs {
+  background: #ffffff;
+  border: 1px solid #dce3e8;
+  border-radius: 8px;
+  display: inline-flex;
+  gap: 4px;
+  margin-top: 16px;
+  padding: 4px;
+}
+
+.app-tabs button,
+.range-toggle button {
+  background: transparent;
+  border: 0;
+  border-radius: 6px;
+  color: #59656e;
+  font: inherit;
+  min-height: 32px;
+  padding: 0 12px;
+}
+
+.app-tabs button.active,
+.range-toggle button.active {
+  background: #255b72;
+  color: #ffffff;
+}
+
 .metric-card.ok svg,
 .ok {
   color: #39705f;
@@ -254,6 +281,263 @@ button:disabled {
   gap: 16px;
   grid-template-columns: minmax(320px, 1.4fr) minmax(260px, 1fr);
   margin-top: 16px;
+}
+
+.history-risk-workspace {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: minmax(230px, 0.36fr) minmax(0, 1fr);
+  margin-top: 16px;
+}
+
+.history-selector-panel,
+.risk-chart-card {
+  background: #ffffff;
+  border: 1px solid #dce3e8;
+  border-radius: 8px;
+  padding: 14px;
+}
+
+.history-selector-panel header,
+.risk-chart-card > header,
+.risk-analysis header,
+.geo-event-panel header {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.history-selector-panel h2,
+.risk-chart-card h2 {
+  font-size: 15px;
+  margin: 0;
+}
+
+.history-selector-panel header span,
+.risk-chart-card header span,
+.risk-analysis header span,
+.geo-event-panel header span {
+  color: #59656e;
+  font-size: 12px;
+}
+
+.history-security-list,
+.history-graph-stack,
+.geo-event-list {
+  display: grid;
+  gap: 10px;
+}
+
+.history-security-list {
+  max-height: 760px;
+  overflow: auto;
+}
+
+.history-security-list p,
+.geo-event-list > p {
+  color: #59656e;
+  font-size: 12px;
+  margin: 0;
+}
+
+.history-security-button {
+  background: #f7f9fa;
+  border: 1px solid #e0e7eb;
+  border-radius: 6px;
+  color: #182026;
+  display: grid;
+  gap: 3px;
+  padding: 9px;
+  text-align: left;
+}
+
+.history-security-button.active {
+  background: #eef4f8;
+  border-color: #255b72;
+}
+
+.history-security-button span,
+.history-security-button em,
+.history-security-button small {
+  color: #59656e;
+  font-size: 12px;
+  font-style: normal;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.range-toggle {
+  align-items: center;
+  background: #f0f4f6;
+  border: 1px solid #dce3e8;
+  border-radius: 8px;
+  display: flex;
+  gap: 2px;
+  padding: 3px;
+}
+
+.history-risk-stats {
+  background: #f6f8f9;
+  border: 1px solid #dce3e8;
+  border-radius: 8px;
+  display: grid;
+  gap: 8px 12px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin-bottom: 12px;
+  padding: 12px;
+}
+
+.history-risk-stats span {
+  color: #59656e;
+  font-size: 12px;
+}
+
+.history-risk-stats strong {
+  font-size: 13px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.risk-svg {
+  display: block;
+  height: auto;
+  width: 100%;
+}
+
+.risk-svg rect:first-child {
+  fill: #fbfcfd;
+}
+
+.axis-line {
+  stroke: #d5e0e6;
+  stroke-width: 1;
+}
+
+.axis-label {
+  fill: #59656e;
+  font-size: 11px;
+}
+
+.axis-label.end {
+  text-anchor: end;
+}
+
+.risk-band {
+  fill: rgba(37, 91, 114, 0.12);
+}
+
+.risk-bound {
+  fill: none;
+  stroke-dasharray: 5 4;
+  stroke-width: 1.5;
+}
+
+.risk-bound.upper {
+  stroke: #b85b3f;
+}
+
+.risk-bound.lower {
+  stroke: #39705f;
+}
+
+.price-line {
+  fill: none;
+  stroke: #24516d;
+  stroke-width: 2.4;
+}
+
+.volume-bar {
+  fill: #9bb7c5;
+  opacity: 0.55;
+}
+
+.risk-point {
+  stroke: #ffffff;
+  stroke-width: 1.2;
+}
+
+.current-price-line,
+.risk-threshold {
+  stroke: #8d9aa3;
+  stroke-dasharray: 4 4;
+  stroke-width: 1;
+}
+
+.geo-line {
+  fill: none;
+  stroke: #8b6f31;
+  stroke-width: 2.2;
+}
+
+.event-marker-line {
+  stroke: #c8d3d9;
+  stroke-dasharray: 4 4;
+}
+
+.event-marker {
+  fill: #b58a28;
+  stroke: #ffffff;
+  stroke-width: 1.5;
+}
+
+.event-marker.critical {
+  fill: #b85b3f;
+}
+
+.risk-analysis,
+.geo-event-panel {
+  border-top: 1px solid #edf1f4;
+  margin-top: 12px;
+  padding-top: 12px;
+}
+
+.risk-analysis p,
+.geo-event-row p {
+  color: #33424c;
+  font-size: 13px;
+  line-height: 1.5;
+  margin: 0;
+}
+
+.evidence-grid {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  margin-top: 12px;
+}
+
+.evidence-grid strong,
+.geo-event-panel strong {
+  font-size: 13px;
+}
+
+.evidence-grid ul {
+  color: #33424c;
+  font-size: 13px;
+  line-height: 1.5;
+  margin: 8px 0 0;
+  padding-left: 18px;
+}
+
+.geo-event-row {
+  border: 1px solid #e0e7eb;
+  border-radius: 8px;
+  display: grid;
+  gap: 6px;
+  padding: 10px;
+}
+
+.geo-event-row div {
+  display: grid;
+  gap: 2px;
+}
+
+.geo-event-row span {
+  color: #59656e;
+  font-size: 12px;
 }
 
 .order-ticket,
@@ -540,6 +824,15 @@ select {
   }
 
   .workbench {
+    grid-template-columns: 1fr;
+  }
+
+  .history-risk-workspace {
+    grid-template-columns: 1fr;
+  }
+
+  .history-risk-stats,
+  .evidence-grid {
     grid-template-columns: 1fr;
   }
 

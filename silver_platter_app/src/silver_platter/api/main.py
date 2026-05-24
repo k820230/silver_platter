@@ -31,6 +31,7 @@ from silver_platter.headlines import (
     detect_geopolitical_market_alert,
 )
 from silver_platter.health import get_health
+from silver_platter.history_risk import build_price_history_risk_chart
 from silver_platter.ml import FeatureSnapshot, ModelRegistry, predict_many
 from silver_platter.ml_ops import (
     WatchlistRegistry,
@@ -648,6 +649,69 @@ def health() -> Dict[str, Any]:
 def market_volume_leaders(limit: int = 20) -> Dict[str, Any]:
     try:
         return _load_volume_leaders(limit)
+    except ValueError as exc:
+        raise _bad_request(exc) from exc
+
+
+@app.get("/api/history/securities")
+def price_history_securities(limit: int = 100) -> Dict[str, Any]:
+    if limit <= 0 or limit > 500:
+        raise _bad_request(ValueError("limit must be between 1 and 500"))
+    try:
+        connection = connect_goldilocks_from_env()
+        try:
+            items = GoldilocksRepository(connection).list_price_history_securities(limit)
+        finally:
+            close = getattr(connection, "close", None)
+            if close is not None:
+                close()
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    return {"items": items}
+
+
+@app.get("/api/history/risk-chart")
+def price_history_risk_chart(
+    security_id: str,
+    market: str = "KR",
+    risk_range: str = "1w",
+    limit: int = 160,
+) -> Dict[str, Any]:
+    if not security_id.strip():
+        raise _bad_request(ValueError("security_id is required"))
+    if limit <= 0 or limit > 500:
+        raise _bad_request(ValueError("limit must be between 1 and 500"))
+    normalized_market = market.strip().upper()
+    normalized_security = security_id.strip().upper()
+    try:
+        connection = connect_goldilocks_from_env()
+        try:
+            bars = GoldilocksRepository(connection).get_price_history_bars(
+                normalized_market,
+                normalized_security,
+                bar_interval="1d",
+                limit=max(limit, 260),
+            )
+        finally:
+            close = getattr(connection, "close", None)
+            if close is not None:
+                close()
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    if not bars:
+        raise HTTPException(
+            status_code=404,
+            detail="no stored price history for %s/%s"
+            % (normalized_market, normalized_security),
+        )
+    try:
+        return build_price_history_risk_chart(
+            normalized_security,
+            normalized_market,
+            bars,
+            selected_range=risk_range,
+            limit=limit,
+        )
     except ValueError as exc:
         raise _bad_request(exc) from exc
 

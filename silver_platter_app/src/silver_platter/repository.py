@@ -2,7 +2,7 @@ import json
 import os
 from datetime import date, datetime
 from numbers import Number
-from typing import Dict, Optional
+from typing import Dict, List, Optional
 
 from silver_platter.alerts import AlertDeliveryResult
 from silver_platter.audit import AuditEvent
@@ -332,6 +332,102 @@ class GoldilocksRepository:
         )
         row = _fetch_one(cursor)
         return 0 if row is None else int(row[0])
+
+    def list_price_history_securities(self, limit: int = 100) -> List[Dict[str, object]]:
+        cursor = self._execute(
+            """
+            SELECT
+                sm.security_id,
+                sm.symbol,
+                sm.security_name,
+                sm.market_code,
+                sm.exchange_code,
+                dp.provider_code,
+                dp.provider_name,
+                pb.bar_interval,
+                COUNT(*) AS bar_count,
+                MIN(pb.bar_ts) AS first_bar_ts,
+                MAX(pb.bar_ts) AS latest_bar_ts
+            FROM SP.price_bar pb
+            JOIN SP.security_master sm
+              ON sm.security_id = pb.security_id
+            JOIN SP.data_provider dp
+              ON dp.provider_id = pb.provider_id
+            GROUP BY
+                sm.security_id,
+                sm.symbol,
+                sm.security_name,
+                sm.market_code,
+                sm.exchange_code,
+                dp.provider_code,
+                dp.provider_name,
+                pb.bar_interval
+            ORDER BY MAX(pb.bar_ts) DESC, COUNT(*) DESC, sm.market_code, sm.symbol
+            """,
+            (),
+        )
+        rows = _fetch_all(cursor)
+        items: List[Dict[str, object]] = []
+        for row in rows[:limit]:
+            items.append(
+                {
+                    "security_db_id": int(row[0]),
+                    "security_id": str(row[1]),
+                    "security_name": str(row[2]),
+                    "market": str(row[3]),
+                    "exchange_code": "" if row[4] is None else str(row[4]),
+                    "provider_code": str(row[5]),
+                    "provider_name": str(row[6]),
+                    "bar_interval": str(row[7]),
+                    "bar_count": int(row[8]),
+                    "first_bar_ts": _iso_datetime(row[9]),
+                    "latest_bar_ts": _iso_datetime(row[10]),
+                }
+            )
+        return items
+
+    def get_price_history_bars(
+        self,
+        market_code: str,
+        symbol: str,
+        bar_interval: str = "1d",
+        limit: int = 500,
+    ) -> List[PriceBarInput]:
+        cursor = self._execute(
+            """
+            SELECT
+                sm.symbol,
+                pb.bar_ts,
+                pb.close_price,
+                pb.volume,
+                pb.turnover_krw,
+                pb.available_to_model_at
+            FROM SP.price_bar pb
+            JOIN SP.security_master sm
+              ON sm.security_id = pb.security_id
+            WHERE sm.market_code = ?
+              AND sm.symbol = ?
+              AND pb.bar_interval = ?
+            ORDER BY pb.bar_ts DESC
+            """,
+            (market_code.strip().upper(), symbol.strip().upper(), bar_interval),
+        )
+        rows = _fetch_all(cursor)
+        bars: List[PriceBarInput] = []
+        for row in reversed(rows[:limit]):
+            bars.append(
+                PriceBarInput(
+                    security_id=str(row[0]),
+                    bar_ts=_datetime_value(row[1]),
+                    close_price=_number_or_none(row[2]),
+                    volume=_number_or_none(row[3]),
+                    turnover_krw=_number_or_none(row[4]),
+                    available_to_model_at=None
+                    if row[5] is None
+                    else _datetime_value(row[5]),
+                )
+            )
+        return bars
 
     def write_price_bar_ingestion(
         self,
@@ -971,9 +1067,34 @@ def _fetch_one(cursor: object) -> Optional[object]:
     return fetchone()
 
 
+def _fetch_all(cursor: object) -> List[object]:
+    fetchall = getattr(cursor, "fetchall", None)
+    if fetchall is None:
+        raise RuntimeError("cursor does not support fetchall")
+    return list(fetchall())
+
+
 def _is_parameter_binding_unsupported(exc: Exception) -> bool:
     message = str(exc).lower()
     return "sqlbindparameter" in message or "optional feature not implemented" in message
+
+
+def _datetime_value(value: object) -> datetime:
+    if isinstance(value, datetime):
+        return value
+    if isinstance(value, date):
+        return datetime.combine(value, datetime.min.time())
+    return datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+
+
+def _iso_datetime(value: object) -> str:
+    return _datetime_value(value).isoformat()
+
+
+def _number_or_none(value: object) -> Optional[float]:
+    if value is None:
+        return None
+    return float(value)
 
 
 def _sql_literal(value: object) -> str:

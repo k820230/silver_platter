@@ -24,6 +24,8 @@ from silver_platter.api.main import (
     market_volume_leaders,
     operations_backup_status,
     operations_provider_health,
+    price_history_risk_chart,
+    price_history_securities,
     provider_catalog,
     security_search,
     SecuritySearchRequest,
@@ -36,11 +38,78 @@ from silver_platter.api.main import (
 from silver_platter.backup import build_backup_manifest, write_backup_manifest
 from silver_platter.exports import export_price_bars_partitioned
 from silver_platter.audit import AuditLog
+from silver_platter.data_quality import PriceBarInput
 from silver_platter.ml_ops import WatchlistRegistry
 from silver_platter.providers import sample_bar
 
 
 class ApiBoundaryTests(TestCase):
+    def test_price_history_securities_lists_db_backed_symbols(self):
+        class FakeConnection:
+            def __init__(self):
+                self.closed = False
+
+            def close(self):
+                self.closed = True
+
+        class FakeRepository:
+            def __init__(self, connection):
+                self.connection = connection
+
+            def list_price_history_securities(self, limit):
+                return [
+                    {
+                        "security_id": "005930",
+                        "market": "KR",
+                        "bar_count": 300,
+                    }
+                ][:limit]
+
+        connection = FakeConnection()
+        with patch.object(api_main, "connect_goldilocks_from_env", return_value=connection), patch.object(
+            api_main,
+            "GoldilocksRepository",
+            FakeRepository,
+        ):
+            payload = price_history_securities(limit=20)
+
+        self.assertEqual("005930", payload["items"][0]["security_id"])
+        self.assertTrue(connection.closed)
+
+    def test_price_history_risk_chart_returns_db_backed_chart(self):
+        class FakeConnection:
+            def close(self):
+                pass
+
+        class FakeRepository:
+            def __init__(self, connection):
+                self.connection = connection
+
+            def get_price_history_bars(self, market, security_id, bar_interval, limit):
+                base = datetime(2026, 5, 1, 16, 0, 0)
+                return [
+                    PriceBarInput(
+                        security_id=security_id,
+                        bar_ts=base.replace(day=index + 1),
+                        close_price=70000 + index * 300,
+                        volume=1000000 + index,
+                        turnover_krw=70000000000,
+                        available_to_model_at=base.replace(day=index + 1),
+                    )
+                    for index in range(22)
+                ]
+
+        with patch.object(api_main, "connect_goldilocks_from_env", return_value=FakeConnection()), patch.object(
+            api_main,
+            "GoldilocksRepository",
+            FakeRepository,
+        ):
+            payload = price_history_risk_chart("005930", market="KR", risk_range="1d", limit=20)
+
+        self.assertEqual("005930", payload["security_id"])
+        self.assertEqual("1d", payload["risk_range"])
+        self.assertEqual(20, len(payload["points"]))
+
     def test_strategy_plugins_endpoint_lists_builtin_plugins(self):
         response = backtest_strategy_plugins()
 

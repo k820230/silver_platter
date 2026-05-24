@@ -49,12 +49,18 @@ class FakeCursor:
             return None
         return self.connection.fetchone_results.pop(0)
 
+    def fetchall(self):
+        if not self.connection.fetchall_results:
+            return []
+        return self.connection.fetchall_results.pop(0)
+
 
 class FakeConnection:
     def __init__(self):
         self.commands = []
         self.commits = 0
         self.fetchone_results = []
+        self.fetchall_results = []
 
     def cursor(self):
         return FakeCursor(self)
@@ -249,6 +255,70 @@ class RepositoryTests(TestCase):
         self.assertEqual(3, count)
         self.assertIn("SELECT COUNT(*)", connection.commands[0][0])
         self.assertEqual((11, 7, "1d"), connection.commands[0][1])
+
+    def test_list_price_history_securities_reads_grouped_price_bars(self):
+        connection = FakeConnection()
+        connection.fetchall_results = [
+            [
+                (
+                    11,
+                    "005930",
+                    "Samsung Electronics",
+                    "KR",
+                    "KRX",
+                    "kis_domestic_daily_price",
+                    "KIS",
+                    "1d",
+                    300,
+                    datetime(2025, 7, 30, 16, 0, 0),
+                    datetime(2026, 5, 22, 16, 0, 0),
+                )
+            ]
+        ]
+        repository = GoldilocksRepository(connection)
+
+        items = repository.list_price_history_securities(limit=20)
+
+        self.assertEqual("005930", items[0]["security_id"])
+        self.assertEqual(300, items[0]["bar_count"])
+        self.assertEqual("kis_domestic_daily_price", items[0]["provider_code"])
+        self.assertIn("GROUP BY", connection.commands[0][0])
+
+    def test_get_price_history_bars_reads_latest_rows_in_time_order(self):
+        connection = FakeConnection()
+        connection.fetchall_results = [
+            [
+                (
+                    "005930",
+                    datetime(2026, 5, 22, 16, 0, 0),
+                    71000,
+                    2000,
+                    142000000,
+                    datetime(2026, 5, 22, 16, 0, 0),
+                ),
+                (
+                    "005930",
+                    datetime(2026, 5, 21, 16, 0, 0),
+                    70000,
+                    1000,
+                    70000000,
+                    datetime(2026, 5, 21, 16, 0, 0),
+                ),
+            ]
+        ]
+        repository = GoldilocksRepository(connection)
+
+        bars = repository.get_price_history_bars("KR", "005930", limit=2)
+
+        self.assertEqual(
+            [
+                datetime(2026, 5, 21, 16, 0, 0),
+                datetime(2026, 5, 22, 16, 0, 0),
+            ],
+            [bar.bar_ts for bar in bars],
+        )
+        self.assertEqual(70000.0, bars[0].close_price)
+        self.assertEqual(("KR", "005930", "1d"), connection.commands[0][1])
 
     def test_insert_user_watchlist_item_and_deactivate(self):
         registry = WatchlistRegistry()
