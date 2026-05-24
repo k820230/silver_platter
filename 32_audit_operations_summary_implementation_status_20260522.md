@@ -96,6 +96,7 @@
 - audit repository SQL generation
 - alert delivery result repository SQL generation
 - rollback-only repository smoke의 provider/license writer 경로
+- 운영 화면 summary polling
 
 ## 5. 남은 실제 연동
 
@@ -103,7 +104,6 @@
   - `scripts/goldilocks_repository_smoke` 준비 완료, 기본은 rollback-only smoke opt-in 전 skip
 - user/session actor source 연결
 - setting 변경 diff 저장
-- 운영 화면에서 summary polling
 - 실제 webhook delivery smoke는 script 준비 완료, 현재 환경은 `ALERT_WEBHOOK_URL` 없음
 
 ## 6. 검증 명령

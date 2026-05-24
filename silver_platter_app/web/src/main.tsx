@@ -269,6 +269,8 @@ const DEFAULT_ORDER: OrderForm = {
   strategyMinReturnPct: "0.01",
 };
 
+const DASHBOARD_POLL_INTERVAL_MS = 60_000;
+
 const EMPTY_DASHBOARD: DashboardData = {
   health: null,
   mlJob: null,
@@ -694,6 +696,13 @@ function App() {
   useEffect(() => {
     void refresh(DEFAULT_ORDER);
   }, []);
+
+  useEffect(() => {
+    const intervalId = window.setInterval(() => {
+      void refresh();
+    }, DASHBOARD_POLL_INTERVAL_MS);
+    return () => window.clearInterval(intervalId);
+  }, [refresh]);
 
   const submitPaperOrder = async () => {
     setActionState("loading");

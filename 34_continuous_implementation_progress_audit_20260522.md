@@ -143,6 +143,7 @@
 - operations
 - provider health component mapping
 - provider health license-policy detail
+- operations summary polling in Web dashboard
 - scheduler
 - monthly restore drill scheduler
 - scheduler startup KST timezone handling
