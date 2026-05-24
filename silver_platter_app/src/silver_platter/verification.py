@@ -3,6 +3,7 @@ from datetime import datetime
 from typing import Dict, Iterable, List, Optional, Tuple
 
 from silver_platter.backtest import PaperReplayEvidence
+from silver_platter.backup import BackupRestoreStatus
 
 
 @dataclass(frozen=True)
@@ -169,3 +170,45 @@ def live_safety_to_gate_evidence(
             "reconciliation_passed=%s" % reconciliation_passed,
         ),
     ]
+
+
+def script_result_to_gate_evidence(
+    requirement_id: str,
+    script_name: str,
+    exit_code: int,
+    checked_at: datetime,
+    output: str = "",
+) -> GateEvidence:
+    detail_parts = ["exit_code=%s" % exit_code]
+    if output:
+        detail_parts.append("output=%s" % output[-200:])
+    return GateEvidence(
+        requirement_id=requirement_id,
+        status="pass" if exit_code == 0 else "fail",
+        evidence_uri="script:%s" % script_name,
+        checked_at=checked_at,
+        detail=" ".join(detail_parts),
+    )
+
+
+def backup_status_to_gate_evidence(
+    status: BackupRestoreStatus,
+    checked_at: Optional[datetime] = None,
+) -> GateEvidence:
+    passed = status.status == "ok" and status.restore_status == "ok"
+    evidence_uri = status.latest_manifest_path or status.backup_base_dir
+    return GateEvidence(
+        requirement_id="backup_manifest",
+        status="pass" if passed else "fail",
+        evidence_uri="backup:%s" % evidence_uri,
+        checked_at=checked_at or status.checked_at,
+        detail=(
+            "status=%s backup_status=%s restore_status=%s issues=%s"
+            % (
+                status.status,
+                status.backup_status,
+                status.restore_status,
+                "; ".join(status.issues[:3]),
+            )
+        ),
+    )

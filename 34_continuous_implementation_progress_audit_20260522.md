@@ -145,9 +145,11 @@
 - verification gate
 - G6 paper replay gate evidence
 - G7 live safety gate evidence
+- script result gate evidence conversion
+- backup status G8 evidence conversion
 - migration coverage
 
-현재 테스트 수: 192개
+현재 테스트 수: 195개
 
 ## 7. 검증 증적
 
