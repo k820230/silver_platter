@@ -62,6 +62,7 @@ npm --prefix web run build
 
 For local secrets, create an untracked `.env` and pass it explicitly with `docker-compose --env-file .env ...` or keep secrets in the host environment.
 `./scripts/migrate apply` requires a Goldilocks ODBC configuration via `GOLDILOCKS_ODBC_CONNECT_STRING`, `GOLDILOCKS_ODBC_DSN`, or `GOLDILOCKS_ODBC_DRIVER`.
+Set `WATCHLIST_STORE_PATH` to persist API watchlist changes to a local JSON file; leave it empty for in-memory development mode.
 `./scripts/goldilocks_odbc_smoke` is read-only and skips unless Goldilocks ODBC is configured.
 `./scripts/goldilocks_repository_smoke` rolls back provider/license/audit/scenario/restore/headline writer checks and skips unless `GOLDILOCKS_REPOSITORY_SMOKE_WRITE=1` plus Goldilocks ODBC are configured.
 `./scripts/goldilocks_backup.sh` uses `BACKUP_BASE_DIR`, `GOLDILOCKS_BACKUP_POLICY`, and `GOLDILOCKS_BACKUP_COMMAND`; it runs the configured command inside a dated backup directory, writes a checksum-backed manifest only when backup files are produced, and skips without creating a fake manifest when no command is configured.

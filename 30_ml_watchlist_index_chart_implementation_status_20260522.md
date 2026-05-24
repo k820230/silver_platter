@@ -24,6 +24,7 @@
 - 종목 비활성화 방식 remove
 - active watchlist 조회
 - watchlist registry JSON 저장/복구
+- `WATCHLIST_STORE_PATH` 설정 시 watchlist API JSON persistence
 
 ### 3.2 ML prediction job
 
@@ -79,6 +80,7 @@
 
 - watchlist add/remove/list
 - watchlist JSON persistence round trip
+- watchlist API configured persistence
 - prediction job horizon filtering
 - stored prediction 생성
 - actual price 연결

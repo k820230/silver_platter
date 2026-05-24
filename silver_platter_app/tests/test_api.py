@@ -6,6 +6,7 @@ from unittest.mock import patch
 
 from fastapi import HTTPException
 
+import silver_platter.api.main as api_main
 from silver_platter.api.main import (
     ActualPriceBarRequest,
     BacktestRunRequest,
@@ -22,9 +23,14 @@ from silver_platter.api.main import (
     operations_backup_status,
     operations_provider_health,
     provider_catalog,
+    watchlist_add,
+    watchlist_list,
+    watchlist_remove,
+    WatchlistAddRequest,
 )
 from silver_platter.backup import build_backup_manifest, write_backup_manifest
 from silver_platter.exports import export_price_bars_partitioned
+from silver_platter.ml_ops import WatchlistRegistry
 from silver_platter.providers import sample_bar
 
 
@@ -220,6 +226,28 @@ class ApiBoundaryTests(TestCase):
 
         self.assertEqual(400, raised.exception.status_code)
         self.assertIn("max_backup_age_days", raised.exception.detail)
+
+    def test_watchlist_api_persists_when_store_path_configured(self):
+        with TemporaryDirectory() as tmp, patch.dict(
+            "os.environ",
+            {"WATCHLIST_STORE_PATH": str(Path(tmp) / "watchlist.json")},
+        ):
+            api_main.WATCHLISTS = WatchlistRegistry()
+            api_main.WATCHLIST_STORE_LOADED_FROM = None
+            watchlist_add(WatchlistAddRequest(user_id="u1", security_id="AAPL", note="core"))
+
+            api_main.WATCHLISTS = WatchlistRegistry()
+            api_main.WATCHLIST_STORE_LOADED_FROM = None
+            listed = watchlist_list("u1")
+            removed = watchlist_remove("u1", "AAPL")
+            api_main.WATCHLISTS = WatchlistRegistry()
+            api_main.WATCHLIST_STORE_LOADED_FROM = None
+            listed_after_remove = watchlist_list("u1")
+
+        self.assertEqual(["AAPL"], [item["security_id"] for item in listed["items"]])
+        self.assertEqual("core", listed["items"][0]["note"])
+        self.assertTrue(removed["removed"])
+        self.assertEqual([], listed_after_remove["items"])
 
     def test_ml_job_run_matches_actual_bars_when_observed(self):
         payload = ml_job_run(

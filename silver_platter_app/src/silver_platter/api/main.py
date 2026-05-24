@@ -1,4 +1,5 @@
 from datetime import date, datetime
+import os
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -75,6 +76,7 @@ from silver_platter.tax import (
 app = FastAPI(title="Silver Platter API", version="0.1.0")
 ORDER_IDEMPOTENCY = IdempotencyRegistry()
 WATCHLISTS = WatchlistRegistry()
+WATCHLIST_STORE_LOADED_FROM: Optional[str] = None
 AUDIT_LOG = AuditLog()
 
 
@@ -323,6 +325,30 @@ def _bad_request(exc: Exception) -> HTTPException:
     return HTTPException(status_code=400, detail=str(exc))
 
 
+def _watchlist_store_path() -> Optional[Path]:
+    value = os.getenv("WATCHLIST_STORE_PATH", "").strip()
+    return Path(value) if value else None
+
+
+def _ensure_watchlists_loaded() -> None:
+    global WATCHLISTS
+    global WATCHLIST_STORE_LOADED_FROM
+    path = _watchlist_store_path()
+    if path is None:
+        return
+    key = str(path)
+    if WATCHLIST_STORE_LOADED_FROM == key:
+        return
+    WATCHLISTS = WatchlistRegistry.load_json(path)
+    WATCHLIST_STORE_LOADED_FROM = key
+
+
+def _save_watchlists_if_configured() -> None:
+    path = _watchlist_store_path()
+    if path is not None:
+        WATCHLISTS.save_json(path)
+
+
 def _missing_provider_settings(settings: AppSettings) -> List[str]:
     missing = []
     if not settings.opendart_api_key.strip():
@@ -421,18 +447,23 @@ def ml_predictions(request: MlPredictionRequest) -> Dict[str, Any]:
 
 @app.post("/api/watchlist/items")
 def watchlist_add(request: WatchlistAddRequest) -> Dict[str, Any]:
+    _ensure_watchlists_loaded()
     item = WATCHLISTS.add(request.user_id, request.security_id, request.note)
+    _save_watchlists_if_configured()
     return item.__dict__
 
 
 @app.delete("/api/watchlist/items/{user_id}/{security_id}")
 def watchlist_remove(user_id: str, security_id: str) -> Dict[str, Any]:
+    _ensure_watchlists_loaded()
     item = WATCHLISTS.remove(user_id, security_id)
+    _save_watchlists_if_configured()
     return {"removed": item is not None, "item": None if item is None else item.__dict__}
 
 
 @app.get("/api/watchlist/items/{user_id}")
 def watchlist_list(user_id: str) -> Dict[str, Any]:
+    _ensure_watchlists_loaded()
     return {"items": [item.__dict__ for item in WATCHLISTS.list_active(user_id)]}
 
 
