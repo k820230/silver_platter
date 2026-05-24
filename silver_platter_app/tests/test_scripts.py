@@ -90,6 +90,7 @@ class ScriptHelperTests(TestCase):
             self.assertIn("blocked: OpenDART API key", result.stdout)
             self.assertIn("blocked: ECOS API key", result.stdout)
             self.assertIn("skipped: alert webhook URL", result.stdout)
+            self.assertIn("blocked: Goldilocks ODBC history prefetch storage", result.stdout)
             self.assertIn("external smoke readiness blocked", result.stdout)
 
     def test_external_smoke_readiness_loads_env_and_reports_ready(self):
@@ -105,6 +106,7 @@ class ScriptHelperTests(TestCase):
                         "OPENDART_API_KEY=dart-key",
                         "ECOS_API_KEY=ecos-key",
                         "ALERT_WEBHOOK_URL=https://alerts.example.test/hook",
+                        "GOLDILOCKS_ODBC_DSN=sp_test",
                         "KRX_PRICE_SMOKE_ENABLED=1",
                         "LONG_REPLAY_SNAPSHOT_PATH=%s" % snapshot,
                         "G7_LIVE_SMOKE_APPROVED=1",
@@ -126,6 +128,7 @@ class ScriptHelperTests(TestCase):
             self.assertIn("ready: OpenDART API key", result.stdout)
             self.assertIn("ready: ECOS API key", result.stdout)
             self.assertIn("ready: alert webhook URL", result.stdout)
+            self.assertIn("ready: Goldilocks ODBC history prefetch storage", result.stdout)
             self.assertIn("ready: KRX price smoke opt-in", result.stdout)
             self.assertIn("ready: long replay snapshot", result.stdout)
             self.assertIn("ready: G7 live/paper smoke approval", result.stdout)

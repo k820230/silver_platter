@@ -230,7 +230,7 @@
 - `./scripts/krx_price_smoke` skip 확인: KRX_PRICE_SMOKE_ENABLED 설정 없음
 - `./scripts/ecos_fx_smoke` 통과: USD/KRW rates=10, latest `2026-05-22 1503.5000`
 - `./scripts/provider_smoke` 통과: SEC EDGAR/OpenDART/ECOS actual smoke pass, 미설정 KRX/RSS/OFAC는 guarded skip
-- `./scripts/external_smoke_readiness` 확인: SEC EDGAR/OpenDART/ECOS ready, webhook은 현재 검증 범위에서 skipped, 남은 snapshot/G7 승인 조건 blocked
+- `./scripts/external_smoke_readiness` 확인: SEC EDGAR/OpenDART/ECOS ready, webhook은 현재 검증 범위에서 skipped, 남은 Goldilocks ODBC history prefetch storage/snapshot/G7 승인 조건 blocked
 - `./scripts/official_rss_smoke` skip 확인: OFFICIAL_RSS_SMOKE_ENABLED 설정 없음
 - `./scripts/ofac_recent_actions_smoke` skip 확인: OFAC_RECENT_ACTIONS_SMOKE_ENABLED 설정 없음
 - `OFFICIAL_RSS_SMOKE_ENABLED=1 ./scripts/official_rss_smoke` 통과: Federal Reserve/ECB 각 5건 headline 응답

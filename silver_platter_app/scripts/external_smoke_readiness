@@ -47,6 +47,14 @@ else
   skip "alert webhook URL" "ignored by current verification scope"
 fi
 
+if [ -n "${GOLDILOCKS_ODBC_CONNECT_STRING:-}" ] \
+  || [ -n "${GOLDILOCKS_ODBC_DSN:-}" ] \
+  || [ -n "${GOLDILOCKS_ODBC_DRIVER:-}" ]; then
+  ready "Goldilocks ODBC history prefetch storage"
+else
+  block "Goldilocks ODBC history prefetch storage" "set GOLDILOCKS_ODBC_CONNECT_STRING, GOLDILOCKS_ODBC_DSN, or GOLDILOCKS_ODBC_DRIVER"
+fi
+
 if [ "${KRX_PRICE_SMOKE_ENABLED:-0}" = "1" ]; then
   ready "KRX price smoke opt-in"
 else

@@ -82,7 +82,7 @@ Set `WATCHLIST_STORE_PATH` to persist API watchlist changes to a local JSON file
 `./scripts/ofac_recent_actions_smoke` is read-only and skips unless `OFAC_RECENT_ACTIONS_SMOKE_ENABLED=1` is configured.
 `./scripts/provider_smoke` runs the guarded SEC EDGAR, OpenDART, KRX KIND, KRX price, ECOS FX, official RSS, and OFAC smoke checks.
 `./scripts/alert_webhook_smoke` sends one test alert and skips unless `ALERT_WEBHOOK_URL` is configured.
-`./scripts/external_smoke_readiness` summarizes the external keys, snapshot, and approval flags needed for the remaining non-local smoke checks; webhook delivery is optional and skipped unless configured.
+`./scripts/external_smoke_readiness` summarizes the external keys, Goldilocks ODBC history prefetch storage, snapshot, and approval flags needed for the remaining non-local smoke checks; webhook delivery is optional and skipped unless configured.
 `./scripts/collect_verification_evidence` writes a local gate evidence JSON bundle under `var/verification/` by default; use `--run-smoke-api` to include API smoke evidence and `--write-goldilocks` to persist assessments/evidence through the configured Goldilocks repository writer.
 
 ## MVP Defaults
