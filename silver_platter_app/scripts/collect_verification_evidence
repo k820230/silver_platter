@@ -6,18 +6,28 @@ cd "$(dirname "$0")/.."
 
 PYTHONPATH="${PYTHONPATH:+${PYTHONPATH}:}src" python3 - "$@" <<'PY'
 import argparse
-from datetime import datetime
+from datetime import date, datetime, timedelta
 import os
 from pathlib import Path
 import subprocess
 import sys
 import urllib.request
 
+from silver_platter.accounting import ExecutionPosting, post_execution_fifo
+from silver_platter.backtest import BacktestRunConfig, StrategyOrderCandidate, run_backtest
 from silver_platter.backup import summarize_backup_restore_status
+from silver_platter.broker import BrokerOrderRequest, PaperBrokerAdapter
+from silver_platter.data_quality import PriceBarInput, evaluate_price_bars
+from silver_platter.replay import (
+    ExportedSnapshotReplayConfig,
+    run_exported_snapshot_replay,
+)
 from silver_platter.verification import DEFAULT_GATE_REQUIREMENTS
 from silver_platter.verification import (
+    GateEvidence,
     backup_status_to_gate_evidence,
     build_verification_evidence_bundle,
+    paper_replay_to_gate_evidence,
     script_result_to_gate_evidence,
     write_verification_evidence_bundle,
 )
@@ -54,6 +64,185 @@ def _http_get(url):
         )
 
 
+def _collect_local_gate_evidence(checked_at):
+    evidence = []
+
+    bar_ts = datetime(2026, 5, 22, 9, 0, 0)
+    quality = evaluate_price_bars(
+        [
+            PriceBarInput(
+                "AAPL",
+                bar_ts,
+                200.0,
+                1000.0,
+                200000.0,
+                bar_ts,
+            )
+        ]
+    )
+    evidence.append(
+        GateEvidence(
+            "price_quality",
+            "pass" if quality.status == "ok" else "fail",
+            "local:evaluate_price_bars",
+            checked_at,
+            "status=%s issue_count=%s score=%s"
+            % (quality.status, len(quality.issues), quality.score),
+        )
+    )
+
+    ack = PaperBrokerAdapter().submit_order(
+        BrokerOrderRequest(
+            order_id="verification-paper-order",
+            account_id="verification",
+            security_id="AAPL",
+            side="buy",
+            order_type="limit",
+            quantity=1,
+            limit_price=200.0,
+            market="US",
+        )
+    )
+    evidence.append(
+        GateEvidence(
+            "simulation_no_broker",
+            "pass" if not ack.broker_send_attempted else "fail",
+            "local:PaperBrokerAdapter",
+            checked_at,
+            "broker_send_attempted=%s status=%s" % (ack.broker_send_attempted, ack.status),
+        )
+    )
+
+    buy = post_execution_fifo(
+        ExecutionPosting(
+            "verification-buy",
+            "verification",
+            "AAPL",
+            "buy",
+            10,
+            1000,
+            date(2026, 5, 1),
+        ),
+        [],
+    )
+    sell = post_execution_fifo(
+        ExecutionPosting(
+            "verification-sell",
+            "verification",
+            "AAPL",
+            "sell",
+            4,
+            1200,
+            date(2026, 5, 22),
+            fee_krw=8,
+        ),
+        [buy.created_lot],
+    )
+    evidence.append(
+        GateEvidence(
+            "fifo_pnl",
+            "pass" if sell.realized_pnl_krw == 792 and len(sell.fifo_matches) == 1 else "fail",
+            "local:post_execution_fifo",
+            checked_at,
+            "realized_pnl_krw=%s match_count=%s"
+            % (sell.realized_pnl_krw, len(sell.fifo_matches)),
+        )
+    )
+
+    lookahead_bar = PriceBarInput(
+        "AAPL",
+        bar_ts,
+        20000.0,
+        1000.0,
+        20000000.0,
+        bar_ts + timedelta(minutes=1),
+    )
+
+    def strategy(bar):
+        return StrategyOrderCandidate(
+            security_id=bar.security_id,
+            side="buy",
+            market="US",
+            order_type="limit",
+            price=bar.close_price or 0.0,
+            quantity=1,
+            decision_at=bar.bar_ts,
+            avg_daily_turnover_20d_krw=1000000000.0,
+        )
+
+    result = run_backtest(
+        BacktestRunConfig(
+            "verification-lookahead",
+            "verification",
+            date(2026, 5, 22),
+            date(2026, 5, 22),
+        ),
+        [lookahead_bar],
+        strategy,
+    )
+    accepted_order_count = len([event for event in result.order_events if event.accepted])
+    evidence.append(
+        GateEvidence(
+            "backtest_no_lookahead",
+            "pass" if result.lookahead_violation_count > 0 and accepted_order_count == 0 else "fail",
+            "local:run_backtest",
+            checked_at,
+            "lookahead_violation_count=%s accepted_order_count=%s"
+            % (result.lookahead_violation_count, accepted_order_count),
+        )
+    )
+    return evidence
+
+
+def _failed_long_replay_evidence(message, checked_at, evidence_uri):
+    detail = "error=%s" % message
+    return [
+        GateEvidence("paper_replay_duration", "fail", evidence_uri, checked_at, detail),
+        GateEvidence("paper_no_broker_send", "fail", evidence_uri, checked_at, detail),
+        GateEvidence("paper_no_lookahead", "fail", evidence_uri, checked_at, detail),
+    ]
+
+
+def _collect_long_replay_evidence(snapshot_path, required_min_days, checked_at):
+    if not snapshot_path:
+        return _failed_long_replay_evidence(
+            "LONG_REPLAY_SNAPSHOT_PATH is not configured",
+            checked_at,
+            "snapshot:missing",
+        )
+    path = Path(snapshot_path).expanduser()
+    if not path.exists():
+        return _failed_long_replay_evidence(
+            "snapshot is missing: %s" % path,
+            checked_at,
+            "snapshot:%s" % path,
+        )
+    try:
+        result = run_exported_snapshot_replay(
+            ExportedSnapshotReplayConfig(
+                run_id="verification-long-replay",
+                strategy_id="verification",
+                from_date=date(2026, 1, 2),
+                to_date=date(2026, 5, 22),
+                security_id="005930",
+                snapshot_paths=[path],
+                required_min_days=required_min_days,
+                strategy_plugin_id="fixed-close",
+            )
+        )
+    except Exception as exc:
+        return _failed_long_replay_evidence(
+            "%s: %s" % (exc.__class__.__name__, exc),
+            checked_at,
+            "snapshot:%s" % path,
+        )
+    return paper_replay_to_gate_evidence(
+        result.paper_replay_evidence,
+        required_min_days,
+        checked_at,
+    )
+
+
 def main(argv):
     parser = argparse.ArgumentParser(
         description="Collect local verification outputs into a gate evidence bundle."
@@ -67,10 +256,24 @@ def main(argv):
     )
     parser.add_argument("--skip-check", action="store_true")
     parser.add_argument("--skip-web", action="store_true")
+    parser.add_argument("--run-local-gates", action="store_true")
+    parser.add_argument("--run-long-replay", action="store_true")
     parser.add_argument("--run-smoke-api", action="store_true")
     parser.add_argument("--no-backup", action="store_true")
     parser.add_argument("--write-goldilocks", action="store_true")
     parser.add_argument("--web-url", default=os.getenv("WEB_URL", "http://localhost:3000"))
+    parser.add_argument(
+        "--long-replay-snapshot-path",
+        default=os.getenv(
+            "LONG_REPLAY_SNAPSHOT_PATH",
+            os.getenv("REPLAY_SNAPSHOT_PATH", ""),
+        ),
+    )
+    parser.add_argument(
+        "--long-replay-required-min-days",
+        type=int,
+        default=int(os.getenv("LONG_REPLAY_REQUIRED_MIN_DAYS", "30")),
+    )
     parser.add_argument(
         "--backup-base-dir",
         default=os.getenv("BACKUP_BASE_DIR", "/home/jhkim5/backup_sp"),
@@ -129,6 +332,20 @@ def main(argv):
         )
         gate_ids.append("G2")
         command_failed = command_failed or result.returncode != 0
+
+    if args.run_local_gates:
+        evidence.extend(_collect_local_gate_evidence(checked_at))
+        gate_ids.extend(["G3", "G4", "G5"])
+
+    if args.run_long_replay:
+        evidence.extend(
+            _collect_long_replay_evidence(
+                args.long_replay_snapshot_path,
+                args.long_replay_required_min_days,
+                checked_at,
+            )
+        )
+        gate_ids.append("G6")
 
     if not args.no_backup:
         backup_status = summarize_backup_restore_status(

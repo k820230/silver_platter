@@ -1,3 +1,4 @@
+import json
 import os
 import shutil
 import subprocess
@@ -401,6 +402,34 @@ class ScriptHelperTests(TestCase):
             )
 
             self.assertIn('"requirement_id": "web_health"', output.read_text(encoding="utf-8"))
+
+    def test_collect_verification_evidence_records_local_gate_evidence(self):
+        script = Path(__file__).resolve().parents[1] / "scripts" / "collect_verification_evidence"
+        with TemporaryDirectory() as tmp:
+            output = Path(tmp) / "evidence.json"
+            subprocess.run(
+                [
+                    str(script),
+                    "--skip-check",
+                    "--skip-web",
+                    "--no-backup",
+                    "--run-local-gates",
+                    "--output",
+                    str(output),
+                    "--fail-on-blocked",
+                ],
+                cwd=Path(__file__).resolve().parents[1],
+                env={**os.environ, "PYTHONPATH": "src"},
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+
+            payload = json.loads(output.read_text(encoding="utf-8"))
+            assessments = {item["gate_id"]: item for item in payload["assessments"]}
+            self.assertEqual("pass", assessments["G3"]["status"])
+            self.assertEqual("pass", assessments["G4"]["status"])
+            self.assertEqual("pass", assessments["G5"]["status"])
 
     def test_goldilocks_logical_backup_creates_manifest_with_override_payload(self):
         source_root = Path(__file__).resolve().parents[1]

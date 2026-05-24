@@ -88,7 +88,7 @@ Set `WATCHLIST_STORE_PATH` to persist API watchlist changes to a local JSON file
 Set `KRX_PRICE_SMOKE_REQUIRED=0` or `G7_LIVE_SMOKE_APPROVAL_REQUIRED=0` to explicitly exclude those checks from the current verification scope.
 `./scripts/prepare_long_replay_snapshot` writes a deterministic JSONL replay snapshot to `LONG_REPLAY_SNAPSHOT_PATH`, `REPLAY_SNAPSHOT_PATH`, or `RAW_DATA_DIR/replay_snapshots/long_replay_sample.jsonl`.
 `./scripts/collect_g7_approval_evidence` writes a local G7 evidence bundle for manual live/paper smoke approval; it does not set `G7_LIVE_SMOKE_APPROVED`.
-`./scripts/collect_verification_evidence` writes a local gate evidence JSON bundle under `var/verification/` by default; use `--run-smoke-api` to include API smoke evidence and `--write-goldilocks` to persist assessments/evidence through the configured Goldilocks repository writer.
+`./scripts/collect_verification_evidence` writes a local gate evidence JSON bundle under `var/verification/` by default; use `--run-smoke-api` to include API smoke evidence, `--run-local-gates --run-long-replay` to include G3-G6 deterministic and long replay evidence, and `--write-goldilocks` to persist assessments/evidence through the configured Goldilocks repository writer.
 
 ## MVP Defaults
 
