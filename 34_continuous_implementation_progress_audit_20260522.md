@@ -103,6 +103,7 @@
 - ML job API actual matching
 - ML job API error summary response
 - model performance repository writer SQL generation
+- Web model performance dashboard display
 - charting
 - index chart repository writer SQL generation
 - backtest

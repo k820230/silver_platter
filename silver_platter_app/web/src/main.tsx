@@ -232,6 +232,7 @@ type StrategyPluginsResponse = {
 type DashboardData = {
   health: HealthResponse | null;
   mlJob: MlJobResponse | null;
+  mlPerformance: MlJobResponse | null;
   indexChart: IndexChartResponse | null;
   groupVolatility: GroupVolatilityResponse | null;
   operations: OperationsSummaryResponse | null;
@@ -271,6 +272,7 @@ const DEFAULT_ORDER: OrderForm = {
 const EMPTY_DASHBOARD: DashboardData = {
   health: null,
   mlJob: null,
+  mlPerformance: null,
   indexChart: null,
   groupVolatility: null,
   operations: null,
@@ -323,6 +325,10 @@ function formatNumber(value: number, digits = 1): string {
 
 function formatPct(value: number): string {
   return `${value >= 0 ? "+" : ""}${formatNumber(value, 1)}%`;
+}
+
+function formatErrorPct(value: number): string {
+  return `${formatNumber(value * 100, 2)}%`;
 }
 
 function statusLabel(value: string | undefined): string {
@@ -441,6 +447,30 @@ function sampleBacktestBars(securityId: string) {
   }));
 }
 
+function sampleMlActualBars(securityId: string, asOf: Date, basePrice: number) {
+  const horizons = [
+    ["1d", 1, 1.006],
+    ["1w", 5, 1.018],
+    ["1m", 21, 0.982],
+    ["3m", 63, 1.041],
+  ] as const;
+  return horizons.map(([, days, priceMultiplier]) => {
+    const barTs = new Date(asOf);
+    barTs.setUTCDate(asOf.getUTCDate() + days);
+    barTs.setUTCHours(15, 0, 0, 0);
+    const availableAt = new Date(barTs);
+    availableAt.setUTCHours(16, 0, 0, 0);
+    return {
+      security_id: securityId,
+      bar_ts: barTs.toISOString(),
+      close_price: Math.max(1, Math.round(basePrice * priceMultiplier * 100) / 100),
+      volume: 1_100_000,
+      turnover_krw: 88_000_000_000,
+      available_to_model_at: availableAt.toISOString(),
+    };
+  });
+}
+
 function strategyParameters(form: OrderForm): Record<string, number> {
   if (form.strategyPluginId !== "momentum-threshold") {
     return {};
@@ -453,11 +483,21 @@ function strategyParameters(form: OrderForm): Record<string, number> {
 async function loadDashboardData(form: OrderForm): Promise<DashboardData> {
   const asOf = new Date().toISOString();
   const securityId = form.securityId.trim() || DEFAULT_ORDER.securityId;
+  const basePrice = toNumber(form.price, 0);
+  const performanceAsOf = new Date(asOf);
+  performanceAsOf.setUTCDate(performanceAsOf.getUTCDate() - 70);
   const healthPromise = apiGet<HealthResponse>("/health");
   const mlPromise = apiPost<MlJobResponse>("/api/ml/jobs/run", {
     job_id: `web-${Date.now()}`,
     snapshot: mlSnapshot(form, asOf),
     horizons: ["1d", "1w", "1m", "3m"],
+  });
+  const mlPerformancePromise = apiPost<MlJobResponse>("/api/ml/jobs/run", {
+    job_id: `web-perf-${Date.now()}`,
+    snapshot: mlSnapshot(form, performanceAsOf.toISOString()),
+    horizons: ["1d", "1w", "1m", "3m"],
+    actual_bars: sampleMlActualBars(securityId, performanceAsOf, basePrice),
+    observed_at: asOf,
   });
   const indexPromise = apiPost<IndexChartResponse>("/api/indices/chart", {
     security_id: securityId,
@@ -575,6 +615,7 @@ async function loadDashboardData(form: OrderForm): Promise<DashboardData> {
   const [
     health,
     mlJob,
+    mlPerformance,
     indexChart,
     groupVolatility,
     operations,
@@ -590,6 +631,7 @@ async function loadDashboardData(form: OrderForm): Promise<DashboardData> {
   ] = await Promise.all([
     healthPromise,
     mlPromise,
+    mlPerformancePromise,
     indexPromise,
     groupPromise,
     operationsPromise,
@@ -607,6 +649,7 @@ async function loadDashboardData(form: OrderForm): Promise<DashboardData> {
   return {
     health,
     mlJob,
+    mlPerformance,
     indexChart,
     groupVolatility,
     operations,
@@ -693,6 +736,7 @@ function App() {
 
   const priceRanges = preview?.price_ranges ?? [];
   const latestPrediction = data.mlJob?.predictions.find((item) => item.horizon === "1w");
+  const modelPerformance = data.mlPerformance?.error_summary;
   const latestIndex = data.indexChart?.points.at(-1);
   const selectedStrategy =
     data.strategyPlugins.find((plugin) => plugin.plugin_id === form.strategyPluginId) ?? null;
@@ -1004,6 +1048,39 @@ function App() {
             <div>
               <dt>MAE</dt>
               <dd>{data.mlJob ? formatNumber(data.mlJob.error_summary.mean_absolute_error, 2) : "Unknown"}</dd>
+            </div>
+          </dl>
+        </article>
+
+        <article className="chart-panel">
+          <header>
+            <h2>Model Performance</h2>
+            <Activity size={18} />
+          </header>
+          <dl className="forecast-list">
+            <div>
+              <dt>Samples</dt>
+              <dd>{modelPerformance ? modelPerformance.sample_count : "Unknown"}</dd>
+            </div>
+            <div>
+              <dt>MAE</dt>
+              <dd>
+                {modelPerformance
+                  ? formatNumber(modelPerformance.mean_absolute_error, 2)
+                  : "Unknown"}
+              </dd>
+            </div>
+            <div>
+              <dt>MAPE</dt>
+              <dd>
+                {modelPerformance
+                  ? formatErrorPct(modelPerformance.mean_absolute_pct_error)
+                  : "Unknown"}
+              </dd>
+            </div>
+            <div>
+              <dt>Security</dt>
+              <dd>{modelPerformance?.security_id ?? form.securityId}</dd>
             </div>
           </dl>
         </article>

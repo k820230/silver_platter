@@ -75,6 +75,14 @@
   - optional actual bar matching
 - `POST /api/indices/chart`
 
+### 3.6 Web dashboard
+
+기능:
+
+- 현재 ML forecast와 별도 성능 샘플 호출
+- model performance 카드에서 sample count, MAE, MAPE 표시
+- 기존 `error_summary` API 응답을 dashboard 지표로 연결
+
 ## 4. 테스트
 
 추가 테스트:
@@ -98,6 +106,7 @@
 - not-due/unavailable price bar 자동 매칭 제외
 - ML job API actual bar matching
 - ML job API error summary response
+- Web dashboard model performance summary display
 - error summary
 - model performance summary repository writer SQL generation
 - 지수 chart filtering/sorting
@@ -105,7 +114,7 @@
 
 ## 5. 남은 실제 연동
 
-- model performance dashboard
+- 없음
 
 ## 6. 검증 명령
 
