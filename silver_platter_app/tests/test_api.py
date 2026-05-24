@@ -180,6 +180,36 @@ class ApiBoundaryTests(TestCase):
 
         self.assertEqual("ok", payload["status"])
 
+    def test_backup_status_endpoint_includes_restore_drill_evidence(self):
+        with TemporaryDirectory() as tmp:
+            base = Path(tmp)
+            data_file = base / "goldilocks" / "data" / "part.dat"
+            data_file.parent.mkdir(parents=True)
+            data_file.write_text("payload", encoding="utf-8")
+            write_backup_manifest(
+                build_backup_manifest(base, date.today()),
+                base / "manifest.json",
+            )
+            evidence_path = base / ".restore_drill_runs" / "2026-06-01.json"
+            evidence_path.parent.mkdir(parents=True)
+            evidence_path.write_text(
+                (
+                    '{"completed_at":"2026-06-01T11:02:00+09:00",'
+                    '"scheduled_at":"2026-06-01T11:00:00+09:00",'
+                    '"status":"ok"}'
+                ),
+                encoding="utf-8",
+            )
+
+            payload = operations_backup_status(backup_base_dir=tmp)
+
+        self.assertEqual(str(evidence_path), payload["latest_restore_drill_path"])
+        self.assertEqual("ok", payload["restore_drill_status"])
+        self.assertEqual(
+            "2026-06-01T11:02:00+09:00",
+            payload["restore_drill_checked_at"],
+        )
+
     def test_backup_status_endpoint_rejects_invalid_max_backup_age_days(self):
         with self.assertRaises(HTTPException) as raised:
             operations_backup_status(max_backup_age_days=0)

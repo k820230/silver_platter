@@ -125,6 +125,7 @@
 - invalid backup date status degradation
 - backup status API invalid manifest critical response
 - backup status API max-age parameter validation
+- backup status API restore drill evidence response
 - backup status API smoke response validation
 - audit
 - operations
@@ -141,7 +142,7 @@
 - G7 live safety gate evidence
 - migration coverage
 
-현재 테스트 수: 186개
+현재 테스트 수: 187개
 
 ## 7. 검증 증적
 

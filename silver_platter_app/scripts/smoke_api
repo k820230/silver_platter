@@ -73,6 +73,8 @@ import sys
 payload = json.load(sys.stdin)
 if payload["status"] != "degraded" or payload["backup_status"] != "missing":
     raise SystemExit("unexpected empty backup status: %s" % payload)
+if payload["restore_drill_status"] != "missing" or payload["latest_restore_drill_path"] is not None:
+    raise SystemExit("unexpected empty restore drill status: %s" % payload)
 ' >/dev/null
 
 curl -fsS "${API_URL}/api/operations/provider-health" >/dev/null
