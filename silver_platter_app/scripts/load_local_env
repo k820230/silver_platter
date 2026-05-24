@@ -6,8 +6,8 @@ if [ -f .env ]; then
     line="${line%$'\r'}"
     [[ "${line}" =~ ^[[:space:]]*$ ]] && continue
     [[ "${line}" =~ ^[[:space:]]*# ]] && continue
-    if [[ "${line}" =~ ^[[:space:]]*export[[:space:]]+ ]]; then
-      line="${line#export }"
+    if [[ "${line}" =~ ^[[:space:]]*export[[:space:]]+(.+)$ ]]; then
+      line="${BASH_REMATCH[1]}"
     fi
     [[ "${line}" =~ ^[A-Za-z_][A-Za-z0-9_]*= ]] || continue
     key="${line%%=*}"

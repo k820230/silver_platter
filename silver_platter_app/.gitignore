@@ -1,4 +1,7 @@
 .env
+.env~
+.#.env
+\#.env#
 .venv/
 __pycache__/
 *.py[cod]
