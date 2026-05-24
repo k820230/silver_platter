@@ -46,6 +46,7 @@ cd /home/jhkim5/silver_platter/silver_platter_app
 ./scripts/migrate apply
 ./scripts/prepare_long_replay_snapshot
 ./scripts/replay_exported_snapshot --help
+./scripts/collect_g7_approval_evidence
 ./scripts/goldilocks_odbc_smoke
 ./scripts/goldilocks_repository_smoke
 ./scripts/kis_orderable_smoke
@@ -85,6 +86,7 @@ Set `WATCHLIST_STORE_PATH` to persist API watchlist changes to a local JSON file
 `./scripts/alert_webhook_smoke` sends one test alert and skips unless `ALERT_WEBHOOK_URL` is configured.
 `./scripts/external_smoke_readiness` summarizes the external keys, Goldilocks ODBC history prefetch storage, snapshot, and approval flags needed for the remaining non-local smoke checks; webhook delivery is optional and skipped unless configured.
 `./scripts/prepare_long_replay_snapshot` writes a deterministic JSONL replay snapshot to `LONG_REPLAY_SNAPSHOT_PATH`, `REPLAY_SNAPSHOT_PATH`, or `RAW_DATA_DIR/replay_snapshots/long_replay_sample.jsonl`.
+`./scripts/collect_g7_approval_evidence` writes a local G7 evidence bundle for manual live/paper smoke approval; it does not set `G7_LIVE_SMOKE_APPROVED`.
 `./scripts/collect_verification_evidence` writes a local gate evidence JSON bundle under `var/verification/` by default; use `--run-smoke-api` to include API smoke evidence and `--write-goldilocks` to persist assessments/evidence through the configured Goldilocks repository writer.
 
 ## MVP Defaults

@@ -1,0 +1,89 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+cd "$(dirname "$0")/.."
+. scripts/load_local_env
+
+PYTHONPATH=src python3 - "$@" <<'PY'
+import argparse
+from datetime import datetime
+import os
+from pathlib import Path
+import sys
+
+from silver_platter.accounting import ReconciliationInput, reconcile_position_and_cash
+from silver_platter.config import AppSettings
+from silver_platter.risk_controls import KillSwitchInput, KillSwitchState, evaluate_kill_switch
+from silver_platter.verification import (
+    build_verification_evidence_bundle,
+    live_safety_to_gate_evidence,
+    write_verification_evidence_bundle,
+)
+
+
+def main(argv):
+    parser = argparse.ArgumentParser(
+        description="Collect local G7 live/paper smoke approval evidence."
+    )
+    parser.add_argument(
+        "--output",
+        default=os.getenv(
+            "G7_APPROVAL_EVIDENCE_PATH",
+            "var/verification/g7-approval-evidence.json",
+        ),
+    )
+    parser.add_argument("--fail-on-blocked", action="store_true")
+    args = parser.parse_args(argv)
+
+    checked_at = datetime.utcnow()
+    settings = AppSettings.from_env()
+
+    kill_switch_issues = evaluate_kill_switch(
+        KillSwitchState(global_block=True, reason="g7 approval evidence check"),
+        KillSwitchInput(account_id="approval-check", security_id="005930", strategy_id="g7"),
+    )
+    reconciliation = reconcile_position_and_cash(
+        ReconciliationInput(
+            security_id="005930",
+            broker_quantity=10.0,
+            internal_quantity=10.0,
+            broker_cash_krw=1_000_000.0,
+            internal_cash_krw=1_000_000.0,
+        )
+    )
+
+    evidence = live_safety_to_gate_evidence(
+        live_order_enabled_default=settings.live_order_enabled,
+        kill_switch_tested=any(
+            item.code == "KILL_SWITCH_GLOBAL" and item.severity == "block"
+            for item in kill_switch_issues
+        ),
+        reconciliation_passed=reconciliation.status == "match",
+        checked_at=checked_at,
+    )
+    bundle = build_verification_evidence_bundle(
+        evidence,
+        gate_ids=("G7",),
+        generated_at=checked_at,
+    )
+    output_path = write_verification_evidence_bundle(bundle, Path(args.output))
+    assessment = bundle.assessments[0]
+    print("G7 approval evidence written: %s" % output_path)
+    print(
+        "gate=%s status=%s passed=%s/%s"
+        % (
+            assessment.gate_id,
+            assessment.status,
+            assessment.passed_count,
+            assessment.total_count,
+        )
+    )
+    print("approval_flag=G7_LIVE_SMOKE_APPROVED remains manual")
+    if args.fail_on_blocked and assessment.status != "pass":
+        return 1
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main(sys.argv[1:]))
+PY

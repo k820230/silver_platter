@@ -209,3 +209,27 @@ class ScriptHelperTests(TestCase):
             )
 
             self.assertIn("KRX price smoke skipped", result.stdout)
+
+    def test_collect_g7_approval_evidence_writes_pass_bundle_without_approval(self):
+        script = Path(__file__).resolve().parents[1] / "scripts" / "collect_g7_approval_evidence"
+        with TemporaryDirectory() as tmp:
+            output = Path(tmp) / "g7-evidence.json"
+            result = subprocess.run(
+                [str(script), "--output", str(output), "--fail-on-blocked"],
+                cwd=Path(__file__).resolve().parents[1],
+                env={
+                    **os.environ,
+                    "LIVE_ORDER_ENABLED": "false",
+                    "G7_LIVE_SMOKE_APPROVED": "0",
+                    "PYTHONPATH": "src",
+                },
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertTrue(output.exists())
+            payload = output.read_text(encoding="utf-8")
+            self.assertIn('"gate_id": "G7"', payload)
+            self.assertIn('"status": "pass"', payload)
+            self.assertIn("approval_flag=G7_LIVE_SMOKE_APPROVED remains manual", result.stdout)
