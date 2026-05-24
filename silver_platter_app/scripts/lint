@@ -3,3 +3,10 @@ set -euo pipefail
 
 cd "$(dirname "$0")/.."
 PYTHONPATH=src python3 -m compileall -q src tests
+
+for script in scripts/*; do
+  [ -f "${script}" ] || continue
+  if head -n 1 "${script}" | grep -Eq '^#!.*(bash|sh)'; then
+    bash -n "${script}"
+  fi
+done
