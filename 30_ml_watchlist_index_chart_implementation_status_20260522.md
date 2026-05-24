@@ -35,6 +35,7 @@
 - 1일/1주/1개월/3개월 예측 job 생성
 - 기존 baseline prediction engine과 연결
 - job 결과를 stored prediction 모델로 변환
+- model registry artifact JSON 저장/복구
 
 ### 3.3 Actual 연결과 오차 계산
 
@@ -86,6 +87,7 @@
 - watchlist API configured persistence
 - watchlist repository writer SQL generation
 - prediction job horizon filtering
+- model registry artifact round trip
 - stored prediction 생성
 - actual price 연결
 - due prediction actual 자동 매칭
@@ -100,7 +102,6 @@
 ## 5. 남은 실제 연동
 
 - ML job queue/RQ 연결
-- model artifact 저장소 연결
 - model performance dashboard
 
 ## 6. 검증 명령

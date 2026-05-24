@@ -1,6 +1,8 @@
 from dataclasses import dataclass, field
 from datetime import datetime
+import json
 from math import sqrt
+from pathlib import Path
 from typing import Dict, Iterable, List, Tuple
 
 
@@ -65,6 +67,62 @@ class ModelRegistry:
         )
         self.register(spec)
         return spec
+
+
+def _model_spec_to_dict(spec: ModelSpec) -> dict:
+    return {
+        "security_id": spec.security_id,
+        "model_id": spec.model_id,
+        "version": spec.version,
+        "horizons": list(spec.horizons),
+        "fine_tuned": spec.fine_tuned,
+        "status": spec.status,
+    }
+
+
+def _model_spec_from_dict(payload: dict) -> ModelSpec:
+    return ModelSpec(
+        security_id=str(payload["security_id"]),
+        model_id=str(payload["model_id"]),
+        version=str(payload["version"]),
+        horizons=tuple(payload.get("horizons", ("1d", "1w", "1m", "3m"))),
+        fine_tuned=bool(payload.get("fine_tuned", True)),
+        status=str(payload.get("status", "active")),
+    )
+
+
+def save_model_registry_artifact(
+    registry: ModelRegistry,
+    artifact_dir: Path,
+    filename: str = "model_registry.json",
+) -> Path:
+    artifact_dir.mkdir(parents=True, exist_ok=True)
+    path = artifact_dir / filename
+    payload = {
+        "models": [
+            _model_spec_to_dict(registry.models[key])
+            for key in sorted(registry.models.keys())
+        ]
+    }
+    path.write_text(
+        json.dumps(payload, ensure_ascii=True, sort_keys=True, indent=2),
+        encoding="utf-8",
+    )
+    return path
+
+
+def load_model_registry_artifact(path: Path) -> ModelRegistry:
+    if not path.exists():
+        return ModelRegistry()
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(payload, dict) or not isinstance(payload.get("models"), list):
+        raise ValueError("model registry artifact must contain a models list")
+    registry = ModelRegistry()
+    for item in payload["models"]:
+        if not isinstance(item, dict):
+            raise ValueError("model registry artifact entry must be an object")
+        registry.register(_model_spec_from_dict(item))
+    return registry
 
 
 def predict_security_metrics(

@@ -93,6 +93,7 @@
 - official RSS headline metadata normalization
 - OFAC Recent Actions headline metadata normalization
 - ML ops
+- model registry artifact persistence
 - watchlist JSON persistence
 - watchlist API configured persistence
 - watchlist repository writer SQL generation
@@ -153,7 +154,7 @@
 - verification status UI card
 - migration coverage
 
-현재 테스트 수: 198개
+현재 테스트 수: 200개
 
 ## 7. 검증 증적
 
