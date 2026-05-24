@@ -185,7 +185,7 @@ MVP catalog에는 다음 source가 포함된다.
 이번 작업은 adapter contract와 local pipeline foundation이다. 다음 항목은 실제 provider별 API credential, rate limit, 데이터 포맷 확인 후 연결한다.
 
 - KRX Data Marketplace daily price network smoke는 opt-in 실행 시 KRX portal OTP가 `LOGOUT`을 반환해 blocked
-- OpenDART network smoke는 script 준비 완료, 현재 환경은 API key 없음
+- OpenDART network smoke 완료: 실제 API key 환경에서 disclosure_count=100 응답 확인
 - KRX KIND network smoke 완료
 - SEC EDGAR network smoke 완료: 실제 contact User-Agent 환경에서 AAPL disclosure metadata 응답 확인
 - ECOS FX network smoke는 script 준비 완료, 현재 환경은 API key 없음

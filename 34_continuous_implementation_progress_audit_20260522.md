@@ -223,12 +223,12 @@
 - `./scripts/collect_verification_evidence --skip-check --run-smoke-api --no-backup --write-goldilocks --output var/verification/evidence-bundle-goldilocks-smoke.json` 통과: G2 assessment/evidence Goldilocks persistence path 확인
 - `./scripts/kis_orderable_smoke` 통과: `005930` 매수가능조회 응답 확인
 - `./scripts/sec_edgar_smoke` 통과: 실제 contact User-Agent 환경에서 AAPL disclosure_count=149, latest `0000320193-26-000013`
-- `./scripts/opendart_smoke` skip 확인: OPENDART_API_KEY 설정 없음
+- `./scripts/opendart_smoke` 통과: 실제 API key 환경에서 disclosure_count=100 응답 확인
 - `./scripts/krx_kind_smoke` skip 확인: KRX_KIND_SMOKE_ENABLED 설정 없음
 - `./scripts/krx_price_smoke` skip 확인: KRX_PRICE_SMOKE_ENABLED 설정 없음
 - `./scripts/ecos_fx_smoke` skip 확인: ECOS_API_KEY 설정 없음
-- `./scripts/provider_smoke` 통과: SEC EDGAR actual smoke pass, 미설정 OpenDART/KRX/ECOS/RSS/OFAC는 guarded skip
-- `./scripts/external_smoke_readiness` 확인: SEC EDGAR ready, 남은 외부 key/webhook/snapshot/G7 승인 조건 blocked
+- `./scripts/provider_smoke` 통과: SEC EDGAR/OpenDART actual smoke pass, 미설정 KRX/ECOS/RSS/OFAC는 guarded skip
+- `./scripts/external_smoke_readiness` 확인: SEC EDGAR/OpenDART ready, 남은 외부 key/webhook/snapshot/G7 승인 조건 blocked
 - `./scripts/official_rss_smoke` skip 확인: OFFICIAL_RSS_SMOKE_ENABLED 설정 없음
 - `./scripts/ofac_recent_actions_smoke` skip 확인: OFAC_RECENT_ACTIONS_SMOKE_ENABLED 설정 없음
 - `OFFICIAL_RSS_SMOKE_ENABLED=1 ./scripts/official_rss_smoke` 통과: Federal Reserve/ECB 각 5건 headline 응답
@@ -271,7 +271,7 @@
 - Goldilocks TCP health는 compose dev 환경에서 `host.docker.internal:11100`으로 확인 완료
 - KRX Data Marketplace daily price smoke는 opt-in 실행 시 KRX download endpoint가 빈 price bars 반환
 - SEC EDGAR network smoke 완료: 실제 contact User-Agent 환경에서 AAPL disclosure metadata 응답 확인
-- OpenDART network smoke는 script 준비 완료, 현재 환경은 API key 없음
+- OpenDART network smoke 완료: 실제 API key 환경에서 disclosure_count=100 응답 확인
 - KRX KIND network smoke 완료
 - ECOS FX network smoke는 script 준비 완료, 현재 환경은 API key 없음
 - Fed/ECB official RSS smoke 완료
