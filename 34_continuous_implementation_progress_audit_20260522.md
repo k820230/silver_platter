@@ -95,10 +95,13 @@
 - ML ops
 - watchlist JSON persistence
 - watchlist API configured persistence
+- watchlist repository writer SQL generation
 - due prediction actual matching
 - ML job API actual matching
 - ML job API error summary response
+- model performance repository writer SQL generation
 - charting
+- index chart repository writer SQL generation
 - backtest
 - paper replay evidence
 - exported snapshot replay
@@ -150,7 +153,7 @@
 - verification status UI card
 - migration coverage
 
-현재 테스트 수: 195개
+현재 테스트 수: 198개
 
 ## 7. 검증 증적
 

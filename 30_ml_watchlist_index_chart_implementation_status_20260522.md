@@ -25,6 +25,7 @@
 - active watchlist 조회
 - watchlist registry JSON 저장/복구
 - `WATCHLIST_STORE_PATH` 설정 시 watchlist API JSON persistence
+- watchlist Goldilocks repository writer SQL generation
 
 ### 3.2 ML prediction job
 
@@ -45,6 +46,7 @@
 - absolute error 계산
 - percentage error 계산
 - 종목별 error summary 계산
+- model performance summary Goldilocks repository writer SQL generation
 
 ### 3.4 변동성/위험도 chart
 
@@ -57,6 +59,7 @@
 - 종목별 변동성 지수와 위험도 점수 시계열 구성
 - 기간 필터
 - API 응답용 dict 변환
+- index chart snapshot Goldilocks repository writer SQL generation
 
 ### 3.5 API
 
@@ -81,6 +84,7 @@
 - watchlist add/remove/list
 - watchlist JSON persistence round trip
 - watchlist API configured persistence
+- watchlist repository writer SQL generation
 - prediction job horizon filtering
 - stored prediction 생성
 - actual price 연결
@@ -89,15 +93,15 @@
 - ML job API actual bar matching
 - ML job API error summary response
 - error summary
+- model performance summary repository writer SQL generation
 - 지수 chart filtering/sorting
+- index chart snapshot repository writer SQL generation
 
 ## 5. 남은 실제 연동
 
-- watchlist Goldilocks writer
 - ML job queue/RQ 연결
 - model artifact 저장소 연결
 - model performance dashboard
-- 지수 시계열 Goldilocks writer
 
 ## 6. 검증 명령
 

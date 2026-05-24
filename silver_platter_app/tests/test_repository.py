@@ -13,8 +13,10 @@ from silver_platter.backtest import (
     apply_scenario_shock,
 )
 from silver_platter.backup import RestoreCheckResult
+from silver_platter.charting import IndexObservation, build_index_chart_series
 from silver_platter.data_pipeline import collect_price_bars
 from silver_platter.headlines import Headline, deduplicate_headlines
+from silver_platter.ml_ops import ModelErrorSummary, WatchlistRegistry
 from silver_platter.order_state import initial_order_state, transition_order_state
 from silver_platter.providers import (
     ProviderMetadata,
@@ -136,6 +138,71 @@ class RepositoryTests(TestCase):
         self.assertEqual(1, connection.commits)
         self.assertEqual(11, connection.commands[-1][1][0])
         self.assertEqual(7, connection.commands[-1][1][1])
+
+    def test_insert_user_watchlist_item_and_deactivate(self):
+        registry = WatchlistRegistry()
+        item = registry.add("u1", "AAPL", note="core")
+        connection = FakeConnection()
+        repository = GoldilocksRepository(connection)
+        deactivated_at = datetime(2026, 5, 23, 9, 0, 0)
+
+        repository.insert_user_watchlist_item(item, security_id=11)
+        repository.deactivate_user_watchlist_item(
+            "u1",
+            security_id=11,
+            deactivated_at=deactivated_at,
+        )
+
+        self.assertIn("SP.user_watchlist", connection.commands[0][0])
+        self.assertEqual(("u1", 11, "core"), connection.commands[0][1][:3])
+        self.assertTrue(connection.commands[0][1][-1])
+        self.assertIn("UPDATE SP.user_watchlist", connection.commands[1][0])
+        self.assertEqual((deactivated_at, "u1", 11), connection.commands[1][1])
+
+    def test_insert_model_error_summary(self):
+        connection = FakeConnection()
+        repository = GoldilocksRepository(connection)
+        calculated_at = datetime(2026, 5, 24, 9, 0, 0)
+
+        repository.insert_model_error_summary(
+            security_id=11,
+            model_version="baseline-0.1",
+            horizon="1d",
+            summary=ModelErrorSummary(
+                security_id="AAPL",
+                sample_count=3,
+                mean_absolute_error=1.25,
+                mean_absolute_pct_error=0.01,
+            ),
+            calculated_at=calculated_at,
+        )
+
+        sql, params = connection.commands[0]
+        self.assertIn("SP.ml_model_performance_summary", sql)
+        self.assertEqual((11, "baseline-0.1", "1d", 3, 1.25, 0.01, calculated_at), params)
+
+    def test_insert_index_chart_snapshot(self):
+        connection = FakeConnection()
+        repository = GoldilocksRepository(connection)
+        generated_at = datetime(2026, 5, 24, 9, 0, 0)
+        series = build_index_chart_series(
+            [
+                IndexObservation("AAPL", datetime(2026, 5, 22, 9, 0, 0), 32.5, 30.1),
+                IndexObservation("AAPL", datetime(2026, 5, 23, 9, 0, 0), 34.0, 31.2),
+            ],
+            "AAPL",
+        )
+
+        repository.insert_index_chart_snapshot(
+            security_id=11,
+            series=series,
+            generated_at=generated_at,
+        )
+
+        sql, params = connection.commands[0]
+        self.assertIn("SP.index_chart_snapshot", sql)
+        self.assertEqual((11, "volatility_risk", None, None, generated_at, 2), params[:6])
+        self.assertIn('"security_id": "AAPL"', params[6])
 
     def test_insert_audit_event_persists_json_detail(self):
         log = AuditLog()

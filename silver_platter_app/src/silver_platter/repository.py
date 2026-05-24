@@ -12,9 +12,11 @@ from silver_platter.backtest import (
     ScenarioShock,
 )
 from silver_platter.backup import RestoreCheckResult
+from silver_platter.charting import IndexChartSeries
 from silver_platter.data_pipeline import PriceBarIngestionResult, RawDataManifest
 from silver_platter.data_quality import DataQualityResult, PriceBarInput
 from silver_platter.headlines import Headline, HeadlineDedupCluster
+from silver_platter.ml_ops import ModelErrorSummary, WatchlistItem
 from silver_platter.order_state import OrderStateEvent
 from silver_platter.providers import ProviderLicensePolicy, ProviderMetadata, SecurityReference
 from silver_platter.risk_controls import EventRiskSignal
@@ -255,6 +257,118 @@ class GoldilocksRepository:
         self.insert_data_quality_run(result.dataset_name, result.quality)
         for bar in result.bars:
             self.insert_price_bar(provider_id, security_id, bar, bar_interval)
+
+    def insert_user_watchlist_item(
+        self,
+        item: WatchlistItem,
+        security_id: int,
+    ) -> None:
+        self._execute(
+            """
+            INSERT INTO SP.user_watchlist (
+                user_id,
+                security_id,
+                note,
+                created_at,
+                deactivated_at,
+                is_active
+            )
+            VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            (
+                item.user_id,
+                security_id,
+                item.note,
+                item.created_at,
+                None if item.is_active else datetime.utcnow(),
+                item.is_active,
+            ),
+        )
+
+    def deactivate_user_watchlist_item(
+        self,
+        user_id: str,
+        security_id: int,
+        deactivated_at: Optional[datetime] = None,
+    ) -> None:
+        self._execute(
+            """
+            UPDATE SP.user_watchlist
+            SET is_active = FALSE,
+                deactivated_at = ?
+            WHERE user_id = ?
+              AND security_id = ?
+              AND is_active = TRUE
+            """,
+            (
+                deactivated_at or datetime.utcnow(),
+                user_id,
+                security_id,
+            ),
+        )
+
+    def insert_model_error_summary(
+        self,
+        security_id: int,
+        model_version: str,
+        horizon: str,
+        summary: ModelErrorSummary,
+        calculated_at: Optional[datetime] = None,
+    ) -> None:
+        self._execute(
+            """
+            INSERT INTO SP.ml_model_performance_summary (
+                security_id,
+                model_version,
+                horizon,
+                sample_count,
+                mean_absolute_error,
+                mean_absolute_pct_error,
+                calculated_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                security_id,
+                model_version,
+                horizon,
+                summary.sample_count,
+                summary.mean_absolute_error,
+                summary.mean_absolute_pct_error,
+                calculated_at or datetime.utcnow(),
+            ),
+        )
+
+    def insert_index_chart_snapshot(
+        self,
+        security_id: int,
+        series: IndexChartSeries,
+        chart_type: str = "volatility_risk",
+        generated_at: Optional[datetime] = None,
+    ) -> None:
+        self._execute(
+            """
+            INSERT INTO SP.index_chart_snapshot (
+                security_id,
+                chart_type,
+                start_at,
+                end_at,
+                generated_at,
+                point_count,
+                payload
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                security_id,
+                chart_type,
+                series.start_at,
+                series.end_at,
+                generated_at or datetime.utcnow(),
+                len(series.points),
+                json.dumps(series.as_dict(), ensure_ascii=True, sort_keys=True),
+            ),
+        )
 
     def insert_audit_event(self, event: AuditEvent) -> None:
         self._execute(
