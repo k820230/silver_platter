@@ -225,6 +225,10 @@
 - `./scripts/provider_smoke` skip 확인: guarded provider smoke suite
 - `./scripts/official_rss_smoke` skip 확인: OFFICIAL_RSS_SMOKE_ENABLED 설정 없음
 - `./scripts/ofac_recent_actions_smoke` skip 확인: OFAC_RECENT_ACTIONS_SMOKE_ENABLED 설정 없음
+- `OFFICIAL_RSS_SMOKE_ENABLED=1 ./scripts/official_rss_smoke` 통과: Federal Reserve/ECB 각 5건 headline 응답
+- `OFAC_RECENT_ACTIONS_SMOKE_ENABLED=1 ./scripts/ofac_recent_actions_smoke` 통과: 5건 headline 응답, latest `2026-05-21`
+- `KRX_KIND_SMOKE_ENABLED=1 KRX_KIND_SMOKE_SYMBOL=005930 ./scripts/krx_kind_smoke` 통과: endpoint 응답 확인, disclosure_count=0
+- `KRX_PRICE_SMOKE_ENABLED=1 KRX_PRICE_SMOKE_SYMBOL=005930 KRX_PRICE_SMOKE_DATE=2026-05-22 ./scripts/krx_price_smoke` 실패: KRX download endpoint가 빈 price bars 반환
 - `./scripts/alert_webhook_smoke` skip 확인: ALERT_WEBHOOK_URL 설정 없음
 - Web build: `npm --prefix web run build`
 - API import: FastAPI app import 및 route count 확인
@@ -259,13 +263,13 @@
 - Goldilocks ODBC 설정 후 실제 인스턴스 대상 migration apply smoke
 - Goldilocks ODBC smoke는 script 준비 완료, 현재 환경은 ODBC 설정 없음
 - Goldilocks TCP health는 compose dev 환경에서 `host.docker.internal:11100`으로 확인 완료
-- KRX Data Marketplace daily price smoke는 script 준비 완료, 현재 환경은 opt-in disabled
+- KRX Data Marketplace daily price smoke는 opt-in 실행 시 KRX download endpoint가 빈 price bars 반환
 - SEC EDGAR network smoke는 script 준비 완료, 현재 환경은 placeholder User-Agent
 - OpenDART network smoke는 script 준비 완료, 현재 환경은 API key 없음
-- KRX KIND network smoke는 script 준비 완료, 현재 환경은 opt-in disabled
+- KRX KIND network smoke 완료
 - ECOS FX network smoke는 script 준비 완료, 현재 환경은 API key 없음
-- Fed/ECB official RSS smoke는 script 준비 완료, 현재 환경은 opt-in disabled
-- OFAC Recent Actions smoke는 script 준비 완료, 현재 환경은 opt-in disabled
+- Fed/ECB official RSS smoke 완료
+- OFAC Recent Actions smoke 완료
 - Goldilocks ODBC 대상 repository writer smoke
   - `scripts/goldilocks_repository_smoke` 준비 완료, 현재 환경은 opt-in write flag/ODBC 설정 없음
 - KIS 매수가능조회 smoke 완료
